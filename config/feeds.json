@@ -22,7 +22,7 @@
   "feeds": [
     {
       "title": "Wired Top Stories",
-      "feedUrl": "http://feeds.wired.com/wired/index",
+      "feedUrl": "https://www.wired.com/feed",
       "siteUrl": "https://www.wired.com",
       "topic": "Tech",
       "source": "feedbin"

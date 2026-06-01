@@ -73,8 +73,12 @@ Optional repository variables:
 
 - `OPENAI_MODEL`
 - `OPENAI_EMBEDDING_MODEL`
+- `FEED_CONCURRENCY`
+- `FEED_FETCH_ATTEMPTS`
 - `USE_EMBEDDINGS`
 - `FETCH_OG_IMAGES`
+
+The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4` to reduce 403s from feeds that throttle GitHub-hosted runners.
 
 To test the automation without sending, run the workflow manually and keep `dry_run` checked. The generated HTML and JSON are uploaded as the `digest-output` workflow artifact.
 

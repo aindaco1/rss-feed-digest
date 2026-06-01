@@ -3,6 +3,12 @@ import { mapLimit } from "../util/concurrency.js";
 import { firstImageFromHtml, metaImageFromHtml } from "../util/html.js";
 import { normalizeFeedItems } from "./normalizeArticles.js";
 
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)";
+const BROWSER_FALLBACK_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+const RETRYABLE_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504]);
+
 const parser = new Parser({
   customFields: {
     item: [
@@ -53,22 +59,41 @@ export async function fetchArticles(config, window, options = {}) {
   };
 }
 
-export async function fetchFeedXml(feedUrl) {
+export async function fetchFeedXml(feedUrl, options = {}) {
+  const attempts = Number(options.attempts || process.env.FEED_FETCH_ATTEMPTS || 3);
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetchFeedXmlOnce(feedUrl, options, attempt);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= attempts || !isRetryableFetchError(error)) {
+        throw error;
+      }
+
+      await sleep(retryDelayMs(attempt, options));
+    }
+  }
+
+  throw lastError;
+}
+
+async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
+  const fetchImpl = options.fetchImpl || fetch;
 
   try {
-    const response = await fetch(feedUrl, {
+    const response = await fetchImpl(feedUrl, {
       signal: controller.signal,
       redirect: "follow",
-      headers: {
-        accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-        "user-agent": "AlonsoDailyDigest/0.1 (+https://github.com/)"
-      }
+      headers: requestHeaders(options.headers, attempt)
     });
 
     if (!response.ok) {
-      throw new Error(`Status code ${response.status}`);
+      throw statusError(response.status);
     }
 
     const text = await response.text();
@@ -131,9 +156,7 @@ async function fetchMetaImage(url) {
     const response = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
-      headers: {
-        "user-agent": "AlonsoDailyDigest/0.1 (+https://github.com/)"
-      }
+      headers: requestHeaders({ accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" })
     });
 
     if (!response.ok) return null;
@@ -148,4 +171,36 @@ async function fetchMetaImage(url) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function requestHeaders(overrides = {}, attempt = 1) {
+  return {
+    accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    pragma: "no-cache",
+    "user-agent": process.env.FEED_USER_AGENT || (attempt > 1 ? BROWSER_FALLBACK_USER_AGENT : DEFAULT_USER_AGENT),
+    ...overrides
+  };
+}
+
+function statusError(status) {
+  const error = new Error(`Status code ${status}`);
+  error.status = status;
+  return error;
+}
+
+function isRetryableFetchError(error) {
+  if (RETRYABLE_STATUSES.has(error.status)) return true;
+  return error.name === "AbortError" || /fetch failed|network|timeout/i.test(error.message);
+}
+
+function retryDelayMs(attempt, options) {
+  const base = Number(options.retryBaseDelayMs ?? process.env.FEED_RETRY_BASE_DELAY_MS ?? 750);
+  const jitter = Number(options.retryJitterMs ?? process.env.FEED_RETRY_JITTER_MS ?? 250);
+  return base * 2 ** (attempt - 1) + Math.floor(Math.random() * jitter);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
