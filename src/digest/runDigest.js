@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config/loadConfig.js";
 import { fetchArticles, hydrateMissingImages } from "../feeds/fetchFeeds.js";
@@ -19,6 +20,7 @@ const apiKey = process.env.OPENAI_API_KEY;
 const useAI = Boolean(apiKey) && !hasNegativeFlag(args, "ai");
 const useEmbeddings = Boolean(apiKey) && !hasNegativeFlag(args, "embeddings") && process.env.USE_EMBEDDINGS !== "false";
 const fetchOgImages = !hasNegativeFlag(args, "og-images") && process.env.FETCH_OG_IMAGES !== "false";
+const allowPartialSend = hasFlag(args, "allow-feed-failures") || process.env.ALLOW_PARTIAL_DIGEST_SEND === "true";
 
 console.log(`Digest window: ${window.startLabel} -> ${window.endLabel}`);
 console.log(`Mode: ${dryRun ? "dry-run" : "send"}`);
@@ -96,9 +98,27 @@ console.log(`Wrote ${fileURLToPath(htmlPath)}`);
 console.log(`Wrote ${fileURLToPath(jsonPath)}`);
 
 if (!dryRun) {
-  const idempotencyKey = `daily-digest/${window.slug}`;
+  if (failures.length && !allowPartialSend) {
+    console.error(
+      "Not sending digest because feed failures were detected. Set ALLOW_PARTIAL_DIGEST_SEND=true or pass --allow-feed-failures to override."
+    );
+    process.exit(1);
+  }
+
+  const idempotencyKey = `daily-digest/${window.slug}/${shortHash(
+    JSON.stringify({
+      from: process.env.DIGEST_FROM_EMAIL,
+      to: process.env.DIGEST_TO_EMAIL,
+      subject,
+      html
+    })
+  )}`;
   const response = await sendDigestEmail({ html, subject, idempotencyKey });
   console.log(`Sent digest through Resend: ${response.id || JSON.stringify(response)}`);
 }
 
 process.exit(0);
+
+function shortHash(value) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}

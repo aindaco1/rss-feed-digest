@@ -75,10 +75,14 @@ Optional repository variables:
 - `OPENAI_EMBEDDING_MODEL`
 - `FEED_CONCURRENCY`
 - `FEED_FETCH_ATTEMPTS`
+- `SUBSTACK_ARCHIVE_LIMIT`
+- `ALLOW_PARTIAL_DIGEST_SEND`
 - `USE_EMBEDDINGS`
 - `FETCH_OG_IMAGES`
 
 The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4` to reduce 403s from feeds that throttle GitHub-hosted runners.
+If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`.
+Scheduled sends fail before Resend if any feeds fail. Set `ALLOW_PARTIAL_DIGEST_SEND=true` only if you want to send incomplete digests.
 
 To test the automation without sending, run the workflow manually and keep `dry_run` checked. The generated HTML and JSON are uploaded as the `digest-output` workflow artifact.
 

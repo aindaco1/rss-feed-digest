@@ -47,6 +47,8 @@ jobs:
       DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
       FEED_CONCURRENCY: ${{ vars.FEED_CONCURRENCY || '2' }}
       FEED_FETCH_ATTEMPTS: ${{ vars.FEED_FETCH_ATTEMPTS || '4' }}
+      SUBSTACK_ARCHIVE_LIMIT: ${{ vars.SUBSTACK_ARCHIVE_LIMIT || '30' }}
+      ALLOW_PARTIAL_DIGEST_SEND: ${{ vars.ALLOW_PARTIAL_DIGEST_SEND || 'false' }}
       USE_EMBEDDINGS: ${{ vars.USE_EMBEDDINGS || 'true' }}
       FETCH_OG_IMAGES: ${{ vars.FETCH_OG_IMAGES || 'true' }}
     steps:

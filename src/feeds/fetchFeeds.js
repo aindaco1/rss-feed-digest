@@ -70,6 +70,14 @@ export async function fetchFeedXml(feedUrl, options = {}) {
       lastError = error;
 
       if (attempt >= attempts || !isRetryableFetchError(error)) {
+        if (isSubstackFeedUrl(feedUrl) && isRetryableFetchError(error)) {
+          try {
+            return await fetchSubstackArchiveAsRss(feedUrl, options);
+          } catch (fallbackError) {
+            error.message = `${error.message}; Substack archive fallback failed: ${fallbackError.message}`;
+          }
+        }
+
         throw error;
       }
 
@@ -173,6 +181,40 @@ async function fetchMetaImage(url) {
   }
 }
 
+async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
+  const feed = new URL(feedUrl);
+  const archiveUrl = new URL("/api/v1/archive", feed.origin);
+  archiveUrl.searchParams.set("sort", "new");
+  archiveUrl.searchParams.set("search", "");
+  archiveUrl.searchParams.set("offset", "0");
+  archiveUrl.searchParams.set("limit", String(options.substackArchiveLimit || process.env.SUBSTACK_ARCHIVE_LIMIT || 30));
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
+  const fetchImpl = options.fetchImpl || fetch;
+
+  try {
+    const response = await fetchImpl(archiveUrl, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: requestHeaders({ accept: "application/json, text/plain, */*" }, 2)
+    });
+
+    if (!response.ok) {
+      throw statusError(response.status);
+    }
+
+    const posts = await response.json();
+    if (!Array.isArray(posts)) {
+      throw new Error("Archive response was not a post list");
+    }
+
+    return substackPostsToRssXml(feed, posts);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function requestHeaders(overrides = {}, attempt = 1) {
   return {
     accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
@@ -203,4 +245,62 @@ function retryDelayMs(attempt, options) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isSubstackFeedUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.hostname.endsWith(".substack.com") && url.pathname.replace(/\/+$/, "") === "/feed";
+  } catch {
+    return false;
+  }
+}
+
+function substackPostsToRssXml(feed, posts) {
+  const publicationTitle = feed.hostname.replace(/\.substack\.com$/i, "").replace(/[-_]/g, " ");
+  const items = posts.map((post) => substackPostToRssItem(feed, post)).join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>${escapeXml(publicationTitle)}</title><link>${escapeXml(feed.origin)}</link><description>${escapeXml(publicationTitle)}</description>${items}</channel></rss>`;
+}
+
+function substackPostToRssItem(feed, post) {
+  const title = post.title || post.social_title || post.slug || "Untitled";
+  const link = post.canonical_url || new URL(`/p/${post.slug}`, feed.origin).toString();
+  const publishedAt = new Date(post.post_date || post.published_at || post.updated_at || Date.now());
+  const description = post.subtitle || post.description || post.truncated_body_text || "";
+  const content = post.body_html || post.description || post.subtitle || post.truncated_body_text || "";
+  const imageUrl = post.cover_image || post.podcast_episode_image_url || post.podcast_episode_image_info?.url || "";
+  const imageTags = imageUrl
+    ? `<enclosure url="${escapeXml(imageUrl)}" type="${guessImageType(imageUrl)}" /><media:content url="${escapeXml(imageUrl)}" medium="image" type="${guessImageType(imageUrl)}" />`
+    : "";
+
+  return `<item><title>${escapeXml(title)}</title><link>${escapeXml(link)}</link><guid isPermaLink="true">${escapeXml(link)}</guid><pubDate>${escapeXml(publishedAt.toUTCString())}</pubDate><description>${cdata(description)}</description><content:encoded>${cdata(content)}</content:encoded>${imageTags}</item>`;
+}
+
+function guessImageType(imageUrl) {
+  const pathname = safePathname(imageUrl);
+  if (/\.png$/i.test(pathname)) return "image/png";
+  if (/\.gif$/i.test(pathname)) return "image/gif";
+  if (/\.webp$/i.test(pathname)) return "image/webp";
+  return "image/jpeg";
+}
+
+function safePathname(rawUrl) {
+  try {
+    return new URL(rawUrl).pathname;
+  } catch {
+    return "";
+  }
+}
+
+function escapeXml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function cdata(value) {
+  return `<![CDATA[${String(value ?? "").replaceAll("]]>", "]]]]><![CDATA[>")}]]>`;
 }
