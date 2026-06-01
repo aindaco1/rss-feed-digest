@@ -78,6 +78,16 @@ export async function fetchFeedXml(feedUrl, options = {}) {
           }
         }
 
+        if (hasFeedbinCredentials(options)) {
+          try {
+            return await fetchFeedbinFeedAsRss(feedUrl, options);
+          } catch (fallbackError) {
+            error.message = `${error.message}; Feedbin fallback failed: ${fallbackError.message}`;
+          }
+        } else if (isSubstackFeedUrl(feedUrl)) {
+          error.message = `${error.message}; Feedbin fallback not configured`;
+        }
+
         throw error;
       }
 
@@ -215,6 +225,64 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
   }
 }
 
+async function fetchFeedbinFeedAsRss(feedUrl, options = {}) {
+  const env = options.env || process.env;
+  const subscriptions = await fetchFeedbinSubscriptions(options);
+  const subscription = findMatchingFeedbinSubscription(feedUrl, subscriptions);
+
+  if (!subscription) {
+    throw new Error("No matching subscription");
+  }
+
+  const entriesUrl = feedbinApiUrl(`/feeds/${subscription.feed_id}/entries.json`, options);
+  entriesUrl.searchParams.set("per_page", String(options.feedbinPerPage || env.FEEDBIN_PER_PAGE || 100));
+  entriesUrl.searchParams.set("mode", "extended");
+  entriesUrl.searchParams.set("include_enclosure", "true");
+
+  const entries = await fetchFeedbinJson(entriesUrl, options);
+  if (!Array.isArray(entries)) {
+    throw new Error("Entries response was not a list");
+  }
+
+  return feedbinEntriesToRssXml(subscription, entries);
+}
+
+async function fetchFeedbinSubscriptions(options = {}) {
+  const subscriptionsUrl = feedbinApiUrl("/subscriptions.json", options);
+  const subscriptions = await fetchFeedbinJson(subscriptionsUrl, options);
+
+  if (!Array.isArray(subscriptions)) {
+    throw new Error("Subscriptions response was not a list");
+  }
+
+  return subscriptions;
+}
+
+async function fetchFeedbinJson(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
+  const fetchImpl = options.fetchImpl || fetch;
+
+  try {
+    const response = await fetchImpl(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        accept: "application/json",
+        authorization: feedbinAuthorization(options)
+      }
+    });
+
+    if (!response.ok) {
+      throw statusError(response.status);
+    }
+
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function requestHeaders(overrides = {}, attempt = 1) {
   return {
     accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
@@ -254,6 +322,99 @@ function isSubstackFeedUrl(rawUrl) {
   } catch {
     return false;
   }
+}
+
+function hasFeedbinCredentials(options = {}) {
+  const env = options.env || process.env;
+  return Boolean(env.FEEDBIN_EMAIL && env.FEEDBIN_PASSWORD);
+}
+
+function feedbinAuthorization(options = {}) {
+  const env = options.env || process.env;
+  return `Basic ${Buffer.from(`${env.FEEDBIN_EMAIL}:${env.FEEDBIN_PASSWORD}`).toString("base64")}`;
+}
+
+function feedbinApiUrl(path, options = {}) {
+  const env = options.env || process.env;
+  const baseUrl = env.FEEDBIN_API_BASE || "https://api.feedbin.com/v2";
+  return new URL(path.replace(/^\//, ""), `${baseUrl.replace(/\/+$/, "")}/`);
+}
+
+function findMatchingFeedbinSubscription(feedUrl, subscriptions) {
+  return subscriptions.find((subscription) => {
+    return (
+      urlsMatch(feedUrl, subscription.feed_url) ||
+      urlsMatch(feedUrl, subscription.site_url) ||
+      substackHostsMatch(feedUrl, subscription.feed_url) ||
+      substackHostsMatch(feedUrl, subscription.site_url)
+    );
+  });
+}
+
+function urlsMatch(left, right) {
+  const normalizedLeft = normalizeComparableUrl(left);
+  const normalizedRight = normalizeComparableUrl(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+}
+
+function substackHostsMatch(left, right) {
+  try {
+    const leftUrl = new URL(left);
+    const rightUrl = new URL(right);
+    return leftUrl.hostname.endsWith(".substack.com") && leftUrl.hostname === rightUrl.hostname;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeComparableUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    url.hash = "";
+    url.search = "";
+    url.protocol = "https:";
+    url.hostname = url.hostname.toLowerCase();
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function feedbinEntriesToRssXml(subscription, entries) {
+  const items = entries.map(feedbinEntryToRssItem).join("");
+  const title = subscription.title || subscription.feed_url || "Feedbin Feed";
+  const siteUrl = subscription.site_url || subscription.feed_url || "";
+
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>${escapeXml(title)}</title><link>${escapeXml(siteUrl)}</link><description>${escapeXml(title)}</description>${items}</channel></rss>`;
+}
+
+function feedbinEntryToRssItem(entry) {
+  const title = entry.title || entry.url || "Untitled";
+  const link = entry.url || "";
+  const publishedAt = new Date(entry.published || entry.created_at || Date.now());
+  const imageUrl = imageFromFeedbinEntry(entry);
+  const imageTags = imageUrl
+    ? `<enclosure url="${escapeXml(imageUrl)}" type="${guessImageType(imageUrl)}" /><media:content url="${escapeXml(imageUrl)}" medium="image" type="${guessImageType(imageUrl)}" />`
+    : "";
+  const author = entry.author ? `<author>${escapeXml(entry.author)}</author>` : "";
+
+  return `<item><title>${escapeXml(title)}</title><link>${escapeXml(link)}</link><guid isPermaLink="false">${escapeXml(String(entry.id || link))}</guid>${author}<pubDate>${escapeXml(publishedAt.toUTCString())}</pubDate><description>${cdata(entry.summary || "")}</description><content:encoded>${cdata(entry.content || entry.summary || "")}</content:encoded>${imageTags}</item>`;
+}
+
+function imageFromFeedbinEntry(entry) {
+  if (entry.enclosure?.enclosure_type?.startsWith("image/") && entry.enclosure.enclosure_url) {
+    return entry.enclosure.enclosure_url;
+  }
+
+  const images = entry.images || {};
+  if (images.original_url) return images.original_url;
+
+  for (const value of Object.values(images)) {
+    if (value?.cdn_url) return value.cdn_url;
+  }
+
+  return null;
 }
 
 function substackPostsToRssXml(feed, posts) {

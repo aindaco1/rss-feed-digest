@@ -73,3 +73,65 @@ test("falls back to Substack archive API when a feed is forbidden", async () => 
   assert.match(xml, /https:\/\/example\.substack\.com\/p\/archive-post/);
   assert.match(xml, /media:content/);
 });
+
+test("falls back to Feedbin when direct and Substack archive fetches are forbidden", async () => {
+  const requestedUrls = [];
+
+  const xml = await fetchFeedXml("https://example.substack.com/feed", {
+    attempts: 1,
+    retryBaseDelayMs: 0,
+    retryJitterMs: 0,
+    env: {
+      FEEDBIN_EMAIL: "reader@example.com",
+      FEEDBIN_PASSWORD: "password",
+      FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+    },
+    fetchImpl: async (url, options) => {
+      requestedUrls.push(String(url));
+
+      if (String(url).includes("/api/v1/archive")) {
+        return new Response("Forbidden", { status: 403 });
+      }
+
+      if (String(url) === "https://api.feedbin.test/v2/subscriptions.json") {
+        assert.match(options.headers.authorization, /^Basic /);
+
+        return Response.json([
+          {
+            feed_id: 42,
+            title: "Example Substack",
+            feed_url: "https://example.substack.com/feed",
+            site_url: "https://example.substack.com"
+          }
+        ]);
+      }
+
+      if (String(url).startsWith("https://api.feedbin.test/v2/feeds/42/entries.json")) {
+        return Response.json([
+          {
+            id: 123,
+            title: "Feedbin Post",
+            url: "https://example.substack.com/p/feedbin-post",
+            author: "Example Writer",
+            summary: "Cached summary",
+            content: "<p>Cached body</p>",
+            published: "2026-05-31T18:00:00.000000Z",
+            images: {
+              original_url: "https://images.example.com/feedbin.jpg"
+            }
+          }
+        ]);
+      }
+
+      return new Response("Forbidden", { status: 403 });
+    }
+  });
+
+  assert.equal(requestedUrls[0], "https://example.substack.com/feed");
+  assert.match(requestedUrls[1], /^https:\/\/example\.substack\.com\/api\/v1\/archive\?/);
+  assert.equal(requestedUrls[2], "https://api.feedbin.test/v2/subscriptions.json");
+  assert.match(requestedUrls[3], /^https:\/\/api\.feedbin\.test\/v2\/feeds\/42\/entries\.json\?/);
+  assert.match(xml, /Feedbin Post/);
+  assert.match(xml, /Cached body/);
+  assert.match(xml, /images\.example\.com\/feedbin\.jpg/);
+});
