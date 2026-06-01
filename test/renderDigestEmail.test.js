@@ -37,6 +37,9 @@ test("renders digest header, topics, article metadata, and escaped text", () => 
   assert.match(html, /The Verge/);
   assert.match(html, /class="digest-grid"/);
   assert.match(html, /width="50%" valign="top"/);
+  assert.match(html, /min-width: 421px/);
+  assert.match(html, /max-width: 420px/);
+  assert.doesNotMatch(html, /max-width: 640px/);
   assert.match(html, /<a href="https:\/\/example\.com" style="display:block;text-decoration:none;border:0;line-height:0;"><img class="digest-card-img" src="https:\/\/images\.example\.com\/story\.jpg"/);
 });
 

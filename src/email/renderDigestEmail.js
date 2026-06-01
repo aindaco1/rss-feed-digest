@@ -166,7 +166,10 @@ export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${escapeHtml(title)} - ${escapeHtml(dateLabel)}</title>
     <style>
-      @media screen and (max-width: 640px) {
+      @media screen and (min-width: 421px) {
+        .digest-column { display: table-cell !important; width: 50% !important; }
+      }
+      @media screen and (max-width: 420px) {
         .digest-container { width: 100% !important; max-width: 100% !important; }
         .digest-column { display: block !important; width: 100% !important; padding: 0 !important; }
         .digest-card-img { height: auto !important; }
