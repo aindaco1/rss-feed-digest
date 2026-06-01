@@ -1,0 +1,142 @@
+name: Daily Digest
+
+on:
+  schedule:
+    # GitHub schedules run in UTC. These two entries cover 7:00 AM America/Denver
+    # in both daylight time (MDT, UTC-6) and standard time (MST, UTC-7).
+    - cron: "0 13 * * *"
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Optional start datetime, interpreted in America/Denver if no offset is provided"
+        required: false
+        type: string
+      end:
+        description: "Optional end datetime, interpreted in America/Denver if no offset is provided"
+        required: false
+        type: string
+      test_window:
+        description: "Use 2026-05-30 07:00 through 2026-06-01 07:00 America/Denver"
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: "Write artifacts without sending email"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
+      OPENAI_EMBEDDING_MODEL: ${{ vars.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
+      DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
+      USE_EMBEDDINGS: ${{ vars.USE_EMBEDDINGS || 'true' }}
+      FETCH_OG_IMAGES: ${{ vars.FETCH_OG_IMAGES || 'true' }}
+    steps:
+      - name: Decide whether to run
+        id: mode
+        shell: bash
+        run: |
+          should_run=true
+          send=false
+
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            denver_offset="$(TZ=America/Denver date +%z)"
+            schedule="${{ github.event.schedule }}"
+
+            case "${schedule}:${denver_offset}" in
+              "0 13 * * *:-0600"|"0 14 * * *:-0700")
+                send=true
+                ;;
+              *)
+                should_run=false
+                echo "Skipping ${schedule}; current America/Denver offset is ${denver_offset}."
+                ;;
+            esac
+          elif [[ "${{ inputs.dry_run }}" != "true" ]]; then
+            send=true
+          fi
+
+          echo "should_run=${should_run}" >> "${GITHUB_OUTPUT}"
+          echo "send=${send}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout
+        if: steps.mode.outputs.should_run == 'true'
+        # actions/checkout v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup Node.js
+        if: steps.mode.outputs.should_run == 'true'
+        # actions/setup-node v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: steps.mode.outputs.should_run == 'true'
+        run: npm ci
+
+      - name: Run tests
+        if: steps.mode.outputs.should_run == 'true'
+        run: npm test
+
+      - name: Validate feed config
+        if: steps.mode.outputs.should_run == 'true'
+        run: npm run validate:feeds
+
+      - name: Check send environment
+        if: steps.mode.outputs.should_run == 'true' && steps.mode.outputs.send == 'true'
+        run: npm run check:env
+
+      - name: Build digest
+        if: steps.mode.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          args=()
+
+          if [[ "${{ steps.mode.outputs.send }}" == "true" ]]; then
+            args+=(--send)
+          else
+            args+=(--dry-run)
+          fi
+
+          if [[ "${{ github.event_name }}" != "schedule" ]]; then
+            if [[ "${{ inputs.test_window }}" == "true" ]]; then
+              args+=(--test-window)
+            fi
+
+            if [[ -n "${{ inputs.start }}" ]]; then
+              args+=(--start "${{ inputs.start }}")
+            fi
+
+            if [[ -n "${{ inputs.end }}" ]]; then
+              args+=(--end "${{ inputs.end }}")
+            fi
+          fi
+
+          node src/digest/runDigest.js "${args[@]}"
+
+      - name: Upload digest artifacts
+        if: always() && steps.mode.outputs.should_run == 'true'
+        # actions/upload-artifact v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: digest-output
+          path: out/
+          if-no-files-found: ignore

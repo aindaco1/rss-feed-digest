@@ -1,0 +1,384 @@
+{
+  "digest": {
+    "title": "Alonso's Daily Digest",
+    "timezone": "America/Denver",
+    "sendTime": "07:00",
+    "dateFormat": "MM/dd/yyyy",
+    "headerImageUrl": null
+  },
+  "topics": [
+    "Tech",
+    "Film",
+    "Politics",
+    "Local",
+    "Games",
+    "Music",
+    "Comics",
+    "Sports",
+    "Culture",
+    "Projects",
+    "Downloads"
+  ],
+  "feeds": [
+    {
+      "title": "Wired Top Stories",
+      "feedUrl": "http://feeds.wired.com/wired/index",
+      "siteUrl": "https://www.wired.com",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Mac Rumors",
+      "feedUrl": "http://www.macrumors.com/macrumors.xml",
+      "siteUrl": "https://www.macrumors.com",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Ars Technica",
+      "feedUrl": "http://arstechnica.com/index.ars/rss",
+      "siteUrl": "https://arstechnica.com",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "The Verge",
+      "feedUrl": "https://www.theverge.com/rss/index.xml",
+      "siteUrl": "https://www.theverge.com",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Michael Tsai",
+      "feedUrl": "https://mjtsai.com/blog/feed/",
+      "siteUrl": "https://mjtsai.com/blog",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Web3 Is Going Great",
+      "feedUrl": "https://web3isgoinggreat.com/feed.xml",
+      "siteUrl": "https://web3isgoinggreat.com",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Implications, by Scott Belsky",
+      "feedUrl": "https://www.implications.com/feed",
+      "siteUrl": "https://www.implications.com",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Installer | The Verge",
+      "feedUrl": "https://www.theverge.com/rss/installer-newsletter/index.xml",
+      "siteUrl": "https://www.theverge.com/installer-newsletter",
+      "topic": "Tech",
+      "source": "feedbin"
+    },
+    {
+      "title": "Register Spill",
+      "feedUrl": "https://registerspill.thorstenball.com/feed",
+      "siteUrl": "https://registerspill.thorstenball.com",
+      "topic": "Tech",
+      "source": "substack"
+    },
+    {
+      "title": "On Substack",
+      "feedUrl": "https://on.substack.com/feed",
+      "siteUrl": "https://on.substack.com",
+      "topic": "Tech",
+      "source": "substack"
+    },
+    {
+      "title": "Joblo",
+      "feedUrl": "https://www.joblo.com/feed/",
+      "siteUrl": "https://www.joblo.com/",
+      "topic": "Film",
+      "source": "feedbin"
+    },
+    {
+      "title": "Cinephilia and Beyond",
+      "feedUrl": "https://cinephiliabeyond.org/feed/",
+      "siteUrl": "https://cinephiliabeyond.org",
+      "topic": "Film",
+      "source": "feedbin"
+    },
+    {
+      "title": "Hyperallergic",
+      "feedUrl": "https://hyperallergic.com/feed/",
+      "siteUrl": "https://hyperallergic.com/",
+      "topic": "Film",
+      "source": "feedbin"
+    },
+    {
+      "title": "No Film School",
+      "feedUrl": "https://nofilmschool.com/rss.xml",
+      "siteUrl": "https://nofilmschool.com/",
+      "topic": "Film",
+      "source": "feedbin"
+    },
+    {
+      "title": "Criterion Current",
+      "feedUrl": "https://www.criterion.com/feeds/the-daily",
+      "siteUrl": "https://www.criterion.com/feeds/the-daily",
+      "topic": "Film",
+      "source": "feedbin"
+    },
+    {
+      "title": "DUST WAVE",
+      "feedUrl": "https://dustwave.xyz/feed/",
+      "siteUrl": "https://dustwave.xyz",
+      "topic": "Film",
+      "source": "feedbin"
+    },
+    {
+      "title": "On The Circuit",
+      "feedUrl": "https://onthecircuit.substack.com/feed",
+      "siteUrl": "https://onthecircuit.substack.com",
+      "topic": "Film",
+      "source": "substack"
+    },
+    {
+      "title": "8 Above with Jon Reiss",
+      "feedUrl": "https://jonreiss.substack.com/feed",
+      "siteUrl": "https://jonreiss.substack.com",
+      "topic": "Film",
+      "source": "substack"
+    },
+    {
+      "title": "Sean Rappleyea",
+      "feedUrl": "https://seanrappleyea.substack.com/feed",
+      "siteUrl": "https://seanrappleyea.substack.com",
+      "topic": "Film",
+      "source": "substack"
+    },
+    {
+      "title": "Heavy Shovel Productions",
+      "feedUrl": "https://heavyshovelproductions.substack.com/feed",
+      "siteUrl": "https://heavyshovelproductions.substack.com",
+      "topic": "Film",
+      "source": "substack"
+    },
+    {
+      "title": "Jacobin",
+      "feedUrl": "https://jacobinmag.com/feed/",
+      "siteUrl": "https://jacobin.com",
+      "topic": "Politics",
+      "source": "feedbin"
+    },
+    {
+      "title": "Vox World",
+      "feedUrl": "https://www.vox.com/rss/world/index.xml",
+      "siteUrl": "https://www.vox.com",
+      "topic": "Politics",
+      "source": "feedbin"
+    },
+    {
+      "title": "Der Spiegel",
+      "feedUrl": "https://www.spiegel.de/international/index.rss",
+      "siteUrl": "https://www.spiegel.de/",
+      "topic": "Politics",
+      "source": "feedbin"
+    },
+    {
+      "title": "Raw Story",
+      "feedUrl": "https://www.rawstory.com/category/world/feed/",
+      "siteUrl": "https://www.rawstory.com/",
+      "topic": "Politics",
+      "source": "feedbin"
+    },
+    {
+      "title": "Damage",
+      "feedUrl": "https://www.damagemag.com/feed",
+      "siteUrl": "https://www.damagemag.com/",
+      "topic": "Politics",
+      "source": "feedbin"
+    },
+    {
+      "title": "The Daily Chela",
+      "feedUrl": "https://www.thedailychela.com/feed",
+      "siteUrl": "https://www.thedailychela.com",
+      "topic": "Politics",
+      "source": "substack"
+    },
+    {
+      "title": "DARK SIDE BREW CREW",
+      "feedUrl": "https://nmdarksidebrewcrew.com/feed/",
+      "siteUrl": "https://nmdarksidebrewcrew.com",
+      "topic": "Local",
+      "source": "feedbin"
+    },
+    {
+      "title": "ABQ RAW",
+      "feedUrl": "https://abqraw.com/feed/",
+      "siteUrl": "https://abqraw.com",
+      "topic": "Local",
+      "source": "feedbin"
+    },
+    {
+      "title": "Polygon",
+      "feedUrl": "https://www.polygon.com/rss/index.xml",
+      "siteUrl": "https://www.polygon.com",
+      "topic": "Games",
+      "source": "feedbin"
+    },
+    {
+      "title": "Kotaku",
+      "feedUrl": "https://kotaku.com/rss",
+      "siteUrl": "https://kotaku.com/",
+      "topic": "Games",
+      "source": "feedbin"
+    },
+    {
+      "title": "Stereogum",
+      "feedUrl": "https://www.stereogum.com/feed/",
+      "siteUrl": "https://stereogum.com/",
+      "topic": "Music",
+      "source": "feedbin"
+    },
+    {
+      "title": "Consequence of Sound",
+      "feedUrl": "https://consequenceofsound.net/category/reviews/album-reviews/feed/",
+      "siteUrl": "https://consequence.net",
+      "topic": "Music",
+      "source": "feedbin"
+    },
+    {
+      "title": "Okayplayer",
+      "feedUrl": "https://www.okayplayer.com/news/feed",
+      "siteUrl": "https://www.okayplayer.com/",
+      "topic": "Music",
+      "source": "feedbin",
+      "disabled": true,
+      "disabledReason": "Feedbin export URL returns 404 and no public replacement was found."
+    },
+    {
+      "title": "Hearing Things",
+      "feedUrl": "https://www.hearingthings.co/latest/rss/",
+      "siteUrl": "https://www.hearingthings.co/",
+      "topic": "Music",
+      "source": "feedbin"
+    },
+    {
+      "title": "Comics Beat",
+      "feedUrl": "https://www.comicsbeat.com/category/comics/feed/",
+      "siteUrl": "https://www.comicsbeat.com/category/comics/",
+      "topic": "Comics",
+      "source": "feedbin"
+    },
+    {
+      "title": "Jim Rugg",
+      "feedUrl": "https://jimrugg.substack.com/feed",
+      "siteUrl": "https://jimrugg.substack.com",
+      "topic": "Comics",
+      "source": "substack"
+    },
+    {
+      "title": "Mason Tabitha Make Shit",
+      "feedUrl": "https://masontabithamakeshit.substack.com/feed",
+      "siteUrl": "https://masontabithamakeshit.substack.com",
+      "topic": "Comics",
+      "source": "substack"
+    },
+    {
+      "title": "Bleeding Green Nation",
+      "feedUrl": "https://www.bleedinggreennation.com/rss/index.xml",
+      "siteUrl": "https://www.bleedinggreennation.com/",
+      "topic": "Sports",
+      "source": "feedbin"
+    },
+    {
+      "title": "The Smoking Musket",
+      "feedUrl": "http://feeds.feedburner.com/sportsblogs/smokingmusket.xml",
+      "siteUrl": "https://www.smokingmusket.com/",
+      "topic": "Sports",
+      "source": "feedbin"
+    },
+    {
+      "title": "Amazin' Avenue",
+      "feedUrl": "https://www.amazinavenue.com/rss/current.xml",
+      "siteUrl": "https://www.amazinavenue.com",
+      "topic": "Sports",
+      "source": "feedbin"
+    },
+    {
+      "title": "Defector",
+      "feedUrl": "https://defector.com/feed",
+      "siteUrl": "https://defector.com/",
+      "topic": "Sports",
+      "source": "feedbin"
+    },
+    {
+      "title": "Boing Boing",
+      "feedUrl": "http://feeds.boingboing.net/boingboing/iBag",
+      "siteUrl": "https://boingboing.net/",
+      "topic": "Projects",
+      "source": "feedbin"
+    },
+    {
+      "title": "Dangerous Minds",
+      "feedUrl": "https://dangerousminds.net/feed/",
+      "siteUrl": "https://dangerousminds.net/",
+      "topic": "Projects",
+      "source": "feedbin"
+    },
+    {
+      "title": "Makezine",
+      "feedUrl": "https://makezine.com/feed/",
+      "siteUrl": "https://makezine.com/",
+      "topic": "Projects",
+      "source": "feedbin"
+    },
+    {
+      "title": "Lifehacker",
+      "feedUrl": "https://lifehacker.com/rss",
+      "siteUrl": "https://lifehacker.com/feed/rss",
+      "topic": "Projects",
+      "source": "feedbin"
+    },
+    {
+      "title": "Jason Kottke",
+      "feedUrl": "http://feeds.kottke.org/json",
+      "siteUrl": "https://kottke.org/",
+      "topic": "Projects",
+      "source": "feedbin"
+    },
+    {
+      "title": "Rusty's Electric Dreams",
+      "feedUrl": "https://rustyselectricdreams.substack.com/feed",
+      "siteUrl": "https://rustyselectricdreams.substack.com",
+      "topic": "Culture",
+      "source": "substack"
+    },
+    {
+      "title": "Exystence",
+      "feedUrl": "http://exystence.net/feed/",
+      "siteUrl": "https://exystence.net",
+      "topic": "Downloads",
+      "source": "feedbin"
+    },
+    {
+      "title": "Pitchfork Reviews",
+      "feedUrl": "https://pitchfork.com/feed/reviews/best/albums/rss",
+      "siteUrl": "https://pitchfork.com/reviews/best/albums/",
+      "topic": "Downloads",
+      "source": "feedbin"
+    },
+    {
+      "title": "Get Comics",
+      "feedUrl": "https://getcomics.info/feed/",
+      "siteUrl": "https://getcomics.org/",
+      "topic": "Downloads",
+      "source": "feedbin"
+    },
+    {
+      "title": "YTS",
+      "feedUrl": "https://yts.lt/rss",
+      "siteUrl": "https://yts.bz/",
+      "topic": "Downloads",
+      "source": "feedbin",
+      "titleIncludes": "1080p"
+    }
+  ]
+}

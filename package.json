@@ -1,0 +1,24 @@
+{
+  "name": "rss-feed-digest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "audit:feeds": "node src/feeds/auditFeeds.js",
+    "check:env": "node src/config/checkEnvironment.js",
+    "digest": "node src/digest/runDigest.js",
+    "digest:test": "node src/digest/runDigest.js --test-window --dry-run",
+    "digest:send": "node src/digest/runDigest.js --send",
+    "test": "node --test",
+    "validate:feeds": "node src/feeds/validateFeeds.js",
+    "render:sample": "node src/email/renderDigestEmail.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "date-fns": "^4.4.0",
+    "date-fns-tz": "^3.2.0",
+    "openai": "^6.39.1",
+    "resend": "^6.12.4",
+    "rss-parser": "^3.13.0"
+  }
+}
