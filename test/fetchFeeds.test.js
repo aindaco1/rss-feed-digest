@@ -135,3 +135,53 @@ test("falls back to Feedbin when direct and Substack archive fetches are forbidd
   assert.match(xml, /Cached body/);
   assert.match(xml, /images\.example\.com\/feedbin\.jpg/);
 });
+
+test("matches simple feed URLs to Feedbin root site subscriptions", async () => {
+  const requestedUrls = [];
+
+  const xml = await fetchFeedXml("https://www.joblo.com/feed/", {
+    attempts: 1,
+    retryBaseDelayMs: 0,
+    retryJitterMs: 0,
+    env: {
+      FEEDBIN_EMAIL: "reader@example.com",
+      FEEDBIN_PASSWORD: "password",
+      FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+    },
+    fetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+
+      if (String(url) === "https://api.feedbin.test/v2/subscriptions.json") {
+        return Response.json([
+          {
+            feed_id: 77,
+            title: "Joblo",
+            feed_url: "https://www.joblo.com/",
+            site_url: "https://www.joblo.com/"
+          }
+        ]);
+      }
+
+      if (String(url).startsWith("https://api.feedbin.test/v2/feeds/77/entries.json")) {
+        return Response.json([
+          {
+            id: 456,
+            title: "JoBlo Cached Post",
+            url: "https://www.joblo.com/cached-post/",
+            summary: "Cached JoBlo summary",
+            content: "<p>Cached JoBlo body</p>",
+            published: "2026-05-31T18:00:00.000000Z"
+          }
+        ]);
+      }
+
+      return new Response("Too Many Requests", { status: 429 });
+    }
+  });
+
+  assert.equal(requestedUrls[0], "https://www.joblo.com/feed/");
+  assert.equal(requestedUrls[1], "https://api.feedbin.test/v2/subscriptions.json");
+  assert.match(requestedUrls[2], /^https:\/\/api\.feedbin\.test\/v2\/feeds\/77\/entries\.json\?/);
+  assert.match(xml, /JoBlo Cached Post/);
+  assert.match(xml, /Cached JoBlo body/);
+});

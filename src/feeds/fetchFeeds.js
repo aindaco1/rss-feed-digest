@@ -345,6 +345,7 @@ function findMatchingFeedbinSubscription(feedUrl, subscriptions) {
     return (
       urlsMatch(feedUrl, subscription.feed_url) ||
       urlsMatch(feedUrl, subscription.site_url) ||
+      rootSiteMatchesSimpleFeed(feedUrl, subscription.site_url) ||
       substackHostsMatch(feedUrl, subscription.feed_url) ||
       substackHostsMatch(feedUrl, subscription.site_url)
     );
@@ -365,6 +366,34 @@ function substackHostsMatch(left, right) {
   } catch {
     return false;
   }
+}
+
+function rootSiteMatchesSimpleFeed(feedUrl, siteUrl) {
+  try {
+    const feed = new URL(feedUrl);
+    const site = new URL(siteUrl);
+
+    return (
+      comparableHost(feed.hostname) === comparableHost(site.hostname) &&
+      isSimpleFeedPath(feed.pathname) &&
+      isRootPath(site.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function comparableHost(hostname) {
+  return String(hostname || "").toLowerCase().replace(/^www\./, "");
+}
+
+function isRootPath(pathname) {
+  return !pathname || pathname === "/";
+}
+
+function isSimpleFeedPath(pathname) {
+  const path = String(pathname || "").replace(/\/+$/, "").toLowerCase();
+  return path === "/feed" || path === "/rss" || path === "/atom.xml" || path === "/feed.xml" || path === "/rss.xml";
 }
 
 function normalizeComparableUrl(rawUrl) {
