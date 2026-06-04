@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeFeedItems, stripFeedBoilerplate } from "../src/feeds/normalizeArticles.js";
+import { isLikelySponsoredPost, normalizeFeedItems, stripFeedBoilerplate } from "../src/feeds/normalizeArticles.js";
 
 const feed = {
   title: "Example Feed",
@@ -66,6 +66,28 @@ test("normalizes article summary and text without feed boilerplate", () => {
   assert.equal(articles[0].text, "A short article body.");
 });
 
+test("decodes HTML entities in article titles and snippets", () => {
+  const articles = normalizeFeedItems(
+    feed,
+    {
+      items: [
+        {
+          title: "Pebblebee&#8217;s Halo &amp; Finder can keep you safe",
+          link: "https://example.com/pebblebee",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          contentSnippet: "It&#8217;s on sale and messages aren&#8217;t garbled.",
+          content: "<p>It&#8217;s on sale.</p>"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles[0].title, "Pebblebee’s Halo & Finder can keep you safe");
+  assert.equal(articles[0].summary, "It’s on sale and messages aren’t garbled.");
+  assert.equal(articles[0].text, "It’s on sale.");
+});
+
 test("uses Atom id as the article URL when link and guid are absent", () => {
   const articles = normalizeFeedItems(
     feed,
@@ -110,4 +132,103 @@ test("filters feed items by required title text", () => {
 
   assert.equal(articles.length, 1);
   assert.equal(articles[0].title, "Protector (2025) [1080p] [BluRay] [YTS.BZ]");
+});
+
+test("filters GetComics-style single issue titles when configured", () => {
+  const articles = normalizeFeedItems(
+    { ...feed, title: "Get Comics", excludeSingleIssues: true },
+    {
+      items: [
+        {
+          title: "Superhero Adventures #1 (2026)",
+          link: "https://example.com/superhero-adventures-1",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content: "Single issue"
+        },
+        {
+          title: "Wolverine – The Death and Life of Sabretooth (TPB) (2025)",
+          link: "https://example.com/wolverine-tpb",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          content: "Trade paperback"
+        },
+        {
+          title: "Nocturnals – Halloween Noir (Graphic Novel) (2025)",
+          link: "https://example.com/nocturnals-graphic-novel",
+          isoDate: "2026-05-31T20:00:00.000Z",
+          content: "Graphic novel"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.deepEqual(
+    articles.map((article) => article.title),
+    [
+      "Wolverine – The Death and Life of Sabretooth (TPB) (2025)",
+      "Nocturnals – Halloween Noir (Graphic Novel) (2025)"
+    ]
+  );
+});
+
+test("filters sponsored posts by disclosure text when configured", () => {
+  const articles = normalizeFeedItems(
+    { ...feed, title: "Boing Boing", excludeSponsored: true },
+    {
+      items: [
+        {
+          title: "Why choose between ChatGPT, Claude, and Gemini when one $60 platform gives you all three?",
+          link: "https://example.com/ai-platform-deal",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content:
+            "<p>TL;DR: Get access to multiple AI tools for one price.</p><p>Disclosure: Boing Boing earns a commission on purchases made through links in this post.</p>"
+        },
+        {
+          title: "A history of local theater sponsors",
+          link: "https://example.com/theater-sponsors",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          content: "<p>The story covers how a theater sponsor helped fund free community performances.</p>"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles.length, 1);
+  assert.equal(articles[0].title, "A history of local theater sponsors");
+});
+
+test("scopes page-level sponsored disclosure checks to the current article", () => {
+  assert.equal(
+    isLikelySponsoredPost({
+      title: "Meta backs off tracking workers' keystrokes after they revolt",
+      contentHtml: `<html><body>
+        <article>
+          <h1>Meta backs off tracking workers' keystrokes after they revolt</h1>
+          <p>Meta has backed off a little after workers objected to data collection.</p>
+        </article>
+        <aside>
+          <h2>Store</h2>
+          <p>Disclosure: Boing Boing earns a commission on purchases made through links in this post.</p>
+        </aside>
+      </body></html>`,
+      scopeContentToTitle: true
+    }),
+    false
+  );
+
+  assert.equal(
+    isLikelySponsoredPost({
+      title: "If you're paying a la carte for AI models, this $60 lifetime pass gets you ChatGPT, Claude & more",
+      contentHtml: `<html><body>
+        <article>
+          <h1>If you're paying a la carte for AI models, this $60 lifetime pass gets you ChatGPT, Claude & more</h1>
+          <p>Disclosure: Boing Boing earns a commission on purchases made through links in this post.</p>
+          <p>TL;DR: ChatPlayground AI lets you compare several models.</p>
+        </article>
+      </body></html>`,
+      scopeContentToTitle: true
+    }),
+    true
+  );
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchFeedXml } from "../src/feeds/fetchFeeds.js";
+import { fetchArticles, fetchFeedXml } from "../src/feeds/fetchFeeds.js";
 
 test("retries retryable feed failures", async () => {
   let calls = 0;
@@ -37,6 +37,80 @@ test("sends CDN-friendly feed request headers", async () => {
 
   assert.match(headers["user-agent"], /Mozilla/);
   assert.equal(headers["accept-language"], "en-US,en;q=0.9");
+});
+
+test("filters sponsored articles when disclosure only appears on article page", async () => {
+  const window = {
+    start: new Date("2026-05-30T13:00:00.000Z"),
+    end: new Date("2026-06-01T13:00:00.000Z")
+  };
+  const requestedUrls = [];
+
+  const { articles } = await fetchArticles(
+    {
+      feeds: [
+        {
+          title: "Boing Boing",
+          feedUrl: "https://example.com/feed.xml",
+          siteUrl: "https://example.com/",
+          topic: "Projects",
+          source: "feedbin",
+          excludeSponsored: true
+        }
+      ]
+    },
+    window,
+    {
+      concurrency: 1,
+      sponsoredCheckConcurrency: 1,
+      fetchImpl: async (url) => {
+        requestedUrls.push(String(url));
+
+        if (String(url) === "https://example.com/feed.xml") {
+          return new Response(`<?xml version="1.0"?>
+            <rss version="2.0">
+              <channel>
+                <item>
+                  <title>Why choose between ChatGPT, Claude, and Gemini when one platform gives you all three?</title>
+                  <link>https://example.com/sponsored</link>
+                  <pubDate>Sun, 31 May 2026 18:00:00 GMT</pubDate>
+                  <description>TL;DR: One platform includes several AI tools.</description>
+                </item>
+                <item>
+                  <title>Is the AI apocalypse a religion in disguise?</title>
+                  <link>https://example.com/editorial</link>
+                  <pubDate>Sun, 31 May 2026 19:00:00 GMT</pubDate>
+                  <description>An essay about AI culture.</description>
+                </item>
+              </channel>
+            </rss>`);
+        }
+
+        if (String(url) === "https://example.com/sponsored") {
+          return new Response(
+            "<html><body><p>Disclosure: Boing Boing earns a commission on purchases made through links in this post.</p></body></html>",
+            { headers: { "content-type": "text/html" } }
+          );
+        }
+
+        if (String(url) === "https://example.com/editorial") {
+          return new Response("<html><body><p>An editorial article without a sales disclosure.</p></body></html>", {
+            headers: { "content-type": "text/html" }
+          });
+        }
+
+        return new Response("Not found", { status: 404 });
+      }
+    }
+  );
+
+  assert.deepEqual(requestedUrls, [
+    "https://example.com/feed.xml",
+    "https://example.com/sponsored",
+    "https://example.com/editorial"
+  ]);
+  assert.equal(articles.length, 1);
+  assert.equal(articles[0].title, "Is the AI apocalypse a religion in disguise?");
 });
 
 test("falls back to Substack archive API when a feed is forbidden", async () => {

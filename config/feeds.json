@@ -314,7 +314,8 @@
       "feedUrl": "http://feeds.boingboing.net/boingboing/iBag",
       "siteUrl": "https://boingboing.net/",
       "topic": "Projects",
-      "source": "feedbin"
+      "source": "feedbin",
+      "excludeSponsored": true
     },
     {
       "title": "Dangerous Minds",
@@ -370,7 +371,8 @@
       "feedUrl": "https://getcomics.info/feed/",
       "siteUrl": "https://getcomics.org/",
       "topic": "Downloads",
-      "source": "feedbin"
+      "source": "feedbin",
+      "excludeSingleIssues": true
     },
     {
       "title": "YTS",

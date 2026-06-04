@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
+import * as cheerio from "cheerio";
 import {
   firstImageFromHtml,
   htmlToText,
   cleanWhitespace,
+  decodeHtmlEntities,
   normalizeImageUrl,
   isLikelyNonArticleImageUrl
 } from "../util/html.js";
@@ -34,13 +36,16 @@ export function normalizeFeedItems(feedConfig, parsedFeed, window) {
 }
 
 function shouldIncludeItem(feedConfig, item) {
+  const title = textFromMaybeHtml(item.title || "");
+
+  if (feedConfig.excludeSingleIssues && isLikelySingleIssueComicTitle(title)) return false;
   if (!feedConfig.titleIncludes) return true;
-  const title = cleanWhitespace(item.title || "");
+
   return title.toLowerCase().includes(String(feedConfig.titleIncludes).toLowerCase());
 }
 
 function normalizeItem(feedConfig, item, sourceImageUrl) {
-  const title = cleanWhitespace(item.title || "");
+  const title = textFromMaybeHtml(item.title || "");
   const url = item.link || item.guid || item.id;
   const publishedAt = parsePublishedAt(item);
 
@@ -50,6 +55,9 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
   const text = stripFeedBoilerplate(htmlToText(contentHtml), { title });
   const summarySource = item.contentSnippet || item.summary || item.description || text;
   const summary = (stripFeedBoilerplate(textFromMaybeHtml(summarySource), { title }) || text).slice(0, 1200);
+
+  if (feedConfig.excludeSponsored && isLikelySponsoredPost({ title, summary, text, contentHtml })) return null;
+
   const canonicalUrl = canonicalizeUrl(url);
   const imageUrl = pickImageFromItem(item, contentHtml, canonicalUrl);
 
@@ -162,8 +170,65 @@ function absolutize(url, baseUrl) {
 
 function textFromMaybeHtml(value) {
   const text = String(value || "");
-  return /<[^>]+>/.test(text) ? htmlToText(text) : cleanWhitespace(text);
+  return /<[^>]+>/.test(text) ? htmlToText(text) : cleanWhitespace(decodeHtmlEntities(text));
 }
+
+function isLikelySingleIssueComicTitle(title) {
+  return /(?:^|[\s([{:;,-])#\d+[a-z]?(?=$|[\s)\],.:;–—-])/i.test(title);
+}
+
+export function isLikelySponsoredPost({
+  title = "",
+  summary = "",
+  text = "",
+  contentHtml = "",
+  scopeContentToTitle = false
+} = {}) {
+  const scopedContentText = scopeContentToTitle ? htmlTextForCurrentArticle(contentHtml, title) : htmlToText(contentHtml);
+  const haystack = cleanWhitespace(`${title} ${summary} ${text} ${scopedContentText}`);
+  return SPONSORED_POST_PATTERNS.some((pattern) => pattern.test(haystack));
+}
+
+function htmlTextForCurrentArticle(html, title) {
+  if (!html) return "";
+
+  const $ = cheerio.load(html);
+  $("script, style, noscript, iframe, form").remove();
+
+  const normalizedTitle = normalizeForMatch(title);
+  if (normalizedTitle) {
+    const heading = $("h1, h2")
+      .filter((_, element) => normalizeForMatch($(element).text()).includes(normalizedTitle))
+      .first();
+
+    if (heading.length) {
+      const articleContainer = heading.closest("article, main, [role='main'], .post, .entry");
+      const body = articleContainer
+        .find(".entry-content, .post-content, .article-content, .post-body, .article-body")
+        .first();
+      if (body.length) return cleanWhitespace(body.text());
+      if (articleContainer.length) return cleanWhitespace(articleContainer.text());
+    }
+  }
+
+  return cleanWhitespace($.root().text()).slice(0, 3000);
+}
+
+function normalizeForMatch(value) {
+  return cleanWhitespace(decodeHtmlEntities(value))
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"');
+}
+
+const SPONSORED_POST_PATTERNS = [
+  /\bDisclosure:\s*.{0,260}\b(?:earns?|may\s+earn|receives?)\s+(?:a\s+)?commission\b/i,
+  /\b(?:we|boing\s+boing)\s+(?:may\s+)?(?:earn|receive)s?\s+(?:a\s+)?commission\s+(?:on|from|when|if|through)\b/i,
+  /\bpurchases?\s+made\s+through\s+links?\s+in\s+this\s+post\b/i,
+  /\bthis\s+(?:is\s+)?(?:a\s+)?sponsored\s+(?:post|content|article)\b/i,
+  /\bpaid\s+(?:post|content|placement)\b/i,
+  /\bthis\s+(?:post|article)\s+contains\s+affiliate\s+links\b/i
+];
 
 export function stripFeedBoilerplate(value, options = {}) {
   let cleaned = cleanWhitespace(value);

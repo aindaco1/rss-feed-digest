@@ -113,8 +113,37 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-function decodeHtmlEntities(value) {
-  return value.replace(/&amp;|&#038;/gi, "&").replace(/&#x2f;/gi, "/");
+const NAMED_HTML_ENTITIES = new Map([
+  ["amp", "&"],
+  ["apos", "'"],
+  ["gt", ">"],
+  ["hellip", "..."],
+  ["ldquo", "\u201c"],
+  ["lsquo", "\u2018"],
+  ["mdash", "\u2014"],
+  ["nbsp", " "],
+  ["ndash", "\u2013"],
+  ["quot", '"'],
+  ["rdquo", "\u201d"],
+  ["rsquo", "\u2019"],
+  ["lt", "<"]
+]);
+
+export function decodeHtmlEntities(value = "") {
+  return String(value)
+    .replace(/&#(\d+);?/g, (match, codePoint) => decodeNumericEntity(match, Number.parseInt(codePoint, 10)))
+    .replace(/&#x([0-9a-f]+);?/gi, (match, codePoint) => decodeNumericEntity(match, Number.parseInt(codePoint, 16)))
+    .replace(/&([a-z][a-z0-9]+);/gi, (match, name) => NAMED_HTML_ENTITIES.get(name.toLowerCase()) || match);
+}
+
+function decodeNumericEntity(match, codePoint) {
+  if (!Number.isFinite(codePoint) || codePoint < 0) return match;
+
+  try {
+    return String.fromCodePoint(codePoint);
+  } catch {
+    return match;
+  }
 }
 
 function protocolFor(baseUrl) {

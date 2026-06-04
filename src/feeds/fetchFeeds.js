@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import { mapLimit } from "../util/concurrency.js";
 import { firstImageFromHtml, metaImageFromHtml } from "../util/html.js";
-import { normalizeFeedItems } from "./normalizeArticles.js";
+import { isLikelySponsoredPost, normalizeFeedItems } from "./normalizeArticles.js";
 
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)";
@@ -27,9 +27,12 @@ export async function fetchArticles(config, window, options = {}) {
   const activeFeeds = config.feeds.filter((feed) => !feed.disabled);
   const results = await mapLimit(activeFeeds, concurrency, async (feed) => {
     try {
-      const xml = await fetchFeedXml(feed.feedUrl);
+      const xml = await fetchFeedXml(feed.feedUrl, options);
       const parsed = await parser.parseString(xml);
-      const articles = normalizeFeedItems(feed, parsed, window);
+      const normalizedArticles = normalizeFeedItems(feed, parsed, window);
+      const articles = feed.excludeSponsored
+        ? await filterSponsoredArticlePages(normalizedArticles, options)
+        : normalizedArticles;
       return { feed, articles, error: null };
     } catch (error) {
       return { feed, articles: [], error };
@@ -142,6 +145,54 @@ export async function hydrateMissingImages(articles, options = {}) {
   });
 
   return articles;
+}
+
+async function filterSponsoredArticlePages(articles, options = {}) {
+  if (process.env.FETCH_SPONSORED_CHECKS === "false") return articles;
+
+  const concurrency = Number(options.sponsoredCheckConcurrency || process.env.SPONSORED_CHECK_CONCURRENCY || 3);
+  const checks = await mapLimit(articles, concurrency, async (article) => ({
+    article,
+    sponsored: await isSponsoredArticlePage(article, options)
+  }));
+
+  return checks.filter((check) => !check.sponsored).map((check) => check.article);
+}
+
+async function isSponsoredArticlePage(article, options = {}) {
+  const html = await fetchArticleHtml(article.url, options);
+  if (!html) return false;
+  return isLikelySponsoredPost({
+    title: article.title,
+    summary: article.summary,
+    text: article.text,
+    contentHtml: html,
+    scopeContentToTitle: true
+  });
+}
+
+async function fetchArticleHtml(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(options.sponsoredCheckTimeoutMs || 8000));
+  const fetchImpl = options.fetchImpl || fetch;
+
+  try {
+    const response = await fetchImpl(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: requestHeaders({ accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" })
+    });
+
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) return null;
+
+    return (await response.text()).slice(0, 500000);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function shouldHydrateFromPage(imageUrl) {

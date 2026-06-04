@@ -46,6 +46,14 @@ for (const [index, feed] of config.feeds.entries()) {
     errors.push(`${label}: titleIncludes must be a string`);
   }
 
+  if (feed.excludeSingleIssues !== undefined && typeof feed.excludeSingleIssues !== "boolean") {
+    errors.push(`${label}: excludeSingleIssues must be a boolean`);
+  }
+
+  if (feed.excludeSponsored !== undefined && typeof feed.excludeSponsored !== "boolean") {
+    errors.push(`${label}: excludeSponsored must be a boolean`);
+  }
+
   if (feed.topic && !topics.has(feed.topic)) {
     errors.push(`${label}: topic "${feed.topic}" is not declared in config.topics`);
   }
