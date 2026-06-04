@@ -134,6 +134,40 @@ test("filters feed items by required title text", () => {
   assert.equal(articles[0].title, "Protector (2025) [1080p] [BluRay] [YTS.BZ]");
 });
 
+test("normalizes YTS release titles for display", () => {
+  const articles = normalizeFeedItems(
+    { ...feed, title: "YTS", feedUrl: "https://yts.lt/rss", siteUrl: "https://yts.bz/", titleIncludes: "1080p" },
+    {
+      items: [
+        {
+          title: "Miss You, Love You (2026) [1080p] [WEBRip] [x265] [10bit] [5.1] [YTS.BZ]",
+          link: "https://example.com/miss-you-love-you",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content: "1080p release"
+        },
+        {
+          title: "Slightly New (2024) [1080p] [WEBRip] [YTS.BZ]",
+          link: "https://example.com/slightly-new",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          content: "1080p release"
+        },
+        {
+          title: "Filtered Movie (2026) [720p] [WEBRip] [YTS.BZ]",
+          link: "https://example.com/filtered-movie",
+          isoDate: "2026-05-31T20:00:00.000Z",
+          content: "720p release"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.deepEqual(
+    articles.map((article) => article.title),
+    ["Miss You, Love You (2026) -- (x265, 10bit, 5.1)", "Slightly New (2024) -- (1080p, WEBRip)"]
+  );
+});
+
 test("filters GetComics-style single issue titles when configured", () => {
   const articles = normalizeFeedItems(
     { ...feed, title: "Get Comics", excludeSingleIssues: true },

@@ -129,5 +129,6 @@ Feed entries in `config/feeds.json` support these optional maintenance fields:
 - `disabledReason`: records why a disabled feed is being skipped.
 - `fallbackImageUrl`: supplies a default image when a feed item has none.
 - `titleIncludes`: keeps only items whose title contains the configured text.
+- YTS release titles are shortened for display by dropping source tags such as `[YTS.BZ]` and keeping useful release details.
 - `excludeSponsored`: drops explicit sponsored or affiliate posts, including page-level disclosures when sponsored checks are enabled.
 - `excludeSingleIssues`: drops GetComics-style single-issue posts with issue-number markers such as `#1`.
