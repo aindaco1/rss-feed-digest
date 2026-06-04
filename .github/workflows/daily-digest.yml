@@ -39,14 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
       OPENAI_EMBEDDING_MODEL: ${{ vars.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
-      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
-      DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
-      FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
-      FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
       FEED_CONCURRENCY: ${{ vars.FEED_CONCURRENCY || '2' }}
       FEED_FETCH_ATTEMPTS: ${{ vars.FEED_FETCH_ATTEMPTS || '4' }}
       FEEDBIN_PER_PAGE: ${{ vars.FEEDBIN_PER_PAGE || '100' }}
@@ -113,14 +107,31 @@ jobs:
 
       - name: Check send environment
         if: steps.mode.outputs.should_run == 'true' && steps.mode.outputs.send == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
+          DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
+          FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
+          FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
         run: npm run check:env
 
       - name: Sync Feedbin subscriptions
         if: steps.mode.outputs.should_run == 'true' && steps.mode.outputs.send == 'true' && env.FEEDBIN_SYNC_SUBSCRIPTIONS == 'true'
+        env:
+          FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
+          FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
         run: npm run feedbin:sync
 
       - name: Build digest
         if: steps.mode.outputs.should_run == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
+          DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
+          FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
+          FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
         shell: bash
         run: |
           args=()

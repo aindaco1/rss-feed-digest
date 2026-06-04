@@ -63,6 +63,7 @@ test("filters sponsored articles when disclosure only appears on article page", 
     {
       concurrency: 1,
       sponsoredCheckConcurrency: 1,
+      env: {},
       fetchImpl: async (url) => {
         requestedUrls.push(String(url));
 
