@@ -80,6 +80,8 @@ Optional repository variables:
 - `FEEDBIN_PER_PAGE`
 - `FEEDBIN_SYNC_SUBSCRIPTIONS`
 - `FEEDBIN_SYNC_EXTRA_TITLES`
+- `FEEDBIN_PREFER_FOR_BACKFILLS`
+- `FEEDBIN_BACKFILL_AFTER_HOURS`
 - `SUBSTACK_ARCHIVE_LIMIT`
 - `ALLOW_PARTIAL_DIGEST_SEND`
 - `USE_EMBEDDINGS`
@@ -104,6 +106,7 @@ Optional repository variables:
 The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4` to reduce 403s from feeds that throttle GitHub-hosted runners.
 If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
 Before send runs, the workflow runs `npm run feedbin:sync` so Feedbin has subscriptions for Substack feeds and JoBlo. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable that. `FEEDBIN_SYNC_EXTRA_TITLES` defaults to `Joblo` and can be a comma-separated list.
+Manual backfills and older dry-runs prefer Feedbin cached entries for feeds with `source: "feedbin"` when Feedbin credentials are configured. This avoids losing items from short rolling public feeds such as GetComics. `FEEDBIN_BACKFILL_AFTER_HOURS` defaults to `6`; set `FEEDBIN_PREFER_FOR_BACKFILLS=false` to force direct RSS fetches for historical windows.
 Scheduled sends fail before Resend if any feeds fail. Set `ALLOW_PARTIAL_DIGEST_SEND=true` only if you want to send incomplete digests.
 
 Clustering first combines exact canonical URL matches, then optionally uses embeddings for high-similarity cross-source articles. The fallback scorer builds a corpus-weighted content profile for each article in the digest run from the title, summary, article text, and nearby phrase pairs. Terms and phrases that are rarer in that day's candidate set carry more weight, while low-signal template words are suppressed. Articles merge only when the weighted semantic score is supported by shared signal terms or phrases. After the first pass, clusters are compared again so later bridge articles can still merge earlier related items; larger clusters require compatibility across the cluster so roundup posts do not bridge unrelated stories. `NO_BROAD_CLUSTER_TOPICS` defaults to `Downloads,Sports,Local` to avoid merging release-list feeds and recurring local/sports updates that often share generic titles, teams, places, years, or issue numbers without covering the same story.

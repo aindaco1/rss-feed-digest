@@ -210,6 +210,84 @@ test("falls back to Feedbin when direct and Substack archive fetches are forbidd
   assert.match(xml, /images\.example\.com\/feedbin\.jpg/);
 });
 
+test("prefers Feedbin cached entries for historical feedbin backfills", async () => {
+  const requestedUrls = [];
+  const window = {
+    start: new Date("2026-05-31T13:00:00.000Z"),
+    end: new Date("2026-06-01T13:00:00.000Z")
+  };
+
+  const { articles } = await fetchArticles(
+    {
+      feeds: [
+        {
+          title: "Get Comics",
+          feedUrl: "https://getcomics.info/feed/",
+          siteUrl: "https://getcomics.org/",
+          topic: "Downloads",
+          source: "feedbin",
+          excludeSingleIssues: true
+        }
+      ]
+    },
+    window,
+    {
+      concurrency: 1,
+      now: "2026-06-02T00:00:00.000Z",
+      feedbinBackfillAfterHours: 6,
+      env: {
+        FEEDBIN_EMAIL: "reader@example.com",
+        FEEDBIN_PASSWORD: "password",
+        FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+      },
+      fetchImpl: async (url) => {
+        requestedUrls.push(String(url));
+
+        if (String(url) === "https://api.feedbin.test/v2/subscriptions.json") {
+          return Response.json([
+            {
+              feed_id: 88,
+              title: "Get Comics",
+              feed_url: "https://getcomics.info/feed/",
+              site_url: "https://getcomics.org/"
+            }
+          ]);
+        }
+
+        if (String(url).startsWith("https://api.feedbin.test/v2/feeds/88/entries.json")) {
+          return Response.json([
+            {
+              id: 1,
+              title: "Wolverine – The Death and Life of Sabretooth (TPB) (2025)",
+              url: "https://getcomics.org/marvel/wolverine-the-death-and-life-of-sabretooth-tpb-2025/",
+              summary: "Trade paperback",
+              content: "<p>Trade paperback</p>",
+              published: "2026-05-31T22:55:44.000000Z"
+            },
+            {
+              id: 2,
+              title: "Supergirl – Survive #1 (2026)",
+              url: "https://getcomics.org/dc/supergirl-survive-1-2026/",
+              summary: "Single issue",
+              content: "<p>Single issue</p>",
+              published: "2026-05-31T22:56:44.000000Z"
+            }
+          ]);
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    }
+  );
+
+  assert.equal(requestedUrls[0], "https://api.feedbin.test/v2/subscriptions.json");
+  assert.match(requestedUrls[1], /^https:\/\/api\.feedbin\.test\/v2\/feeds\/88\/entries\.json\?/);
+  assert.deepEqual(
+    articles.map((article) => article.title),
+    ["Wolverine – The Death and Life of Sabretooth (TPB) (2025)"]
+  );
+});
+
 test("matches simple feed URLs to Feedbin root site subscriptions", async () => {
   const requestedUrls = [];
 

@@ -27,7 +27,7 @@ export async function fetchArticles(config, window, options = {}) {
   const activeFeeds = config.feeds.filter((feed) => !feed.disabled);
   const results = await mapLimit(activeFeeds, concurrency, async (feed) => {
     try {
-      const xml = await fetchFeedXml(feed.feedUrl, options);
+      const xml = await fetchConfiguredFeedXml(feed, window, options);
       const parsed = await parser.parseString(xml);
       const normalizedArticles = normalizeFeedItems(feed, parsed, window);
       const articles = feed.excludeSponsored
@@ -60,6 +60,18 @@ export async function fetchArticles(config, window, options = {}) {
     failures,
     skippedFeeds: config.feeds.filter((feed) => feed.disabled)
   };
+}
+
+async function fetchConfiguredFeedXml(feed, window, options = {}) {
+  if (shouldPreferFeedbinForWindow(feed, window, options)) {
+    try {
+      return await fetchFeedbinFeedAsRss(feed.feedUrl, options);
+    } catch (error) {
+      console.warn(`Feedbin preferred fetch failed for ${feed.title}, using direct feed: ${error.message}`);
+    }
+  }
+
+  return fetchFeedXml(feed.feedUrl, options);
 }
 
 export async function fetchFeedXml(feedUrl, options = {}) {
@@ -378,6 +390,20 @@ function isSubstackFeedUrl(rawUrl) {
 function hasFeedbinCredentials(options = {}) {
   const env = options.env || process.env;
   return Boolean(env.FEEDBIN_EMAIL && env.FEEDBIN_PASSWORD);
+}
+
+function shouldPreferFeedbinForWindow(feed, window, options = {}) {
+  const env = options.env || process.env;
+  if (env.FEEDBIN_PREFER_FOR_BACKFILLS === "false") return false;
+  if (feed.source !== "feedbin" || !hasFeedbinCredentials(options)) return false;
+  if (options.preferFeedbin) return true;
+
+  const backfillAfterHours = Number(options.feedbinBackfillAfterHours ?? env.FEEDBIN_BACKFILL_AFTER_HOURS ?? 6);
+  if (!Number.isFinite(backfillAfterHours) || backfillAfterHours < 0) return false;
+
+  const now = options.now ? new Date(options.now) : new Date();
+  if (Number.isNaN(now.getTime())) return false;
+  return now.getTime() - window.end.getTime() >= backfillAfterHours * 60 * 60 * 1000;
 }
 
 function feedbinAuthorization(options = {}) {

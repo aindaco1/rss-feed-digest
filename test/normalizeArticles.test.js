@@ -156,6 +156,18 @@ test("filters GetComics-style single issue titles when configured", () => {
           link: "https://example.com/nocturnals-graphic-novel",
           isoDate: "2026-05-31T20:00:00.000Z",
           content: "Graphic novel"
+        },
+        {
+          title: "Dark Nights – Death Metal Omnibus (2024)",
+          link: "https://example.com/death-metal-omnibus",
+          isoDate: "2026-05-31T21:00:00.000Z",
+          content: "Omnibus"
+        },
+        {
+          title: "2026.06.03 Weekly Pack",
+          link: "https://example.com/weekly-pack",
+          isoDate: "2026-05-31T22:00:00.000Z",
+          content: "Weekly pack"
         }
       ]
     },
@@ -166,7 +178,9 @@ test("filters GetComics-style single issue titles when configured", () => {
     articles.map((article) => article.title),
     [
       "Wolverine – The Death and Life of Sabretooth (TPB) (2025)",
-      "Nocturnals – Halloween Noir (Graphic Novel) (2025)"
+      "Nocturnals – Halloween Noir (Graphic Novel) (2025)",
+      "Dark Nights – Death Metal Omnibus (2024)",
+      "2026.06.03 Weekly Pack"
     ]
   );
 });
