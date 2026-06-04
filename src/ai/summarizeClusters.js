@@ -7,7 +7,7 @@ export async function summarizeClusters(clusters, config, options = {}) {
   const model = options.model || process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const aiMaxClusters = Number(process.env.AI_MAX_CLUSTERS || 80);
   const summarizeAll = process.env.AI_SUMMARIZE_SINGLE_ARTICLES === "true";
-  const client = useAI ? new OpenAI({ apiKey: options.apiKey }) : null;
+  const client = useAI ? options.client || new OpenAI({ apiKey: options.apiKey }) : null;
   let aiCalls = 0;
 
   const digestArticles = await mapLimit(clusters, Number(process.env.AI_CONCURRENCY || 2), async (cluster) => {
@@ -123,7 +123,7 @@ async function summarizeClusterWithAI(client, model, cluster, topics) {
         schema,
         strict: true
       },
-      verbosity: "low"
+      verbosity: "medium"
     }
   });
 
