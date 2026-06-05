@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 
 const DEFAULT_CONFIG_URL = new URL("../../config/feeds.json", import.meta.url);
-const DEFAULT_GENERATED_FEED_URLS = [new URL("../../config/youtube-subscriptions.json", import.meta.url)];
+const DEFAULT_GENERATED_FEED_URLS = [
+  new URL("../../config/youtube-subscriptions.json", import.meta.url),
+  new URL("../../config/podcast-subscriptions.json", import.meta.url)
+];
 
 export function loadConfig(path = DEFAULT_CONFIG_URL, options = {}) {
   const config = JSON.parse(readFileSync(path, "utf8"));

@@ -5,3 +5,4 @@ out/
 .env.*
 !.env.example
 config/youtube-subscriptions.json
+config/podcast-subscriptions.json

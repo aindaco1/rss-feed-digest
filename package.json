@@ -10,6 +10,7 @@
     "digest:test": "node src/digest/runDigest.js --test-window --dry-run",
     "digest:send": "node src/digest/runDigest.js --send",
     "feedbin:sync": "node src/feeds/syncFeedbinSubscriptions.js",
+    "overcast:sync": "node src/feeds/syncOvercastSubscriptions.js",
     "youtube:authorize": "node src/feeds/authorizeYouTube.js",
     "youtube:sync": "node src/feeds/syncYouTubeSubscriptions.js",
     "test": "node --test",

@@ -77,6 +77,11 @@ Optional YouTube subscription sync secrets:
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
 
+Optional Overcast podcast sync secrets:
+
+- `OVERCAST_OPML_BASE64`
+- `OVERCAST_OPML`
+
 Optional repository variables:
 
 - `OPENAI_MODEL`
@@ -88,6 +93,9 @@ Optional repository variables:
 - `FEEDBIN_SYNC_EXTRA_TITLES`
 - `FEEDBIN_PREFER_FOR_BACKFILLS`
 - `FEEDBIN_BACKFILL_AFTER_HOURS`
+- `OVERCAST_SYNC_SUBSCRIPTIONS`
+- `OVERCAST_TOPIC`
+- `OVERCAST_MAX_SUBSCRIPTIONS`
 - `YOUTUBE_SYNC_SUBSCRIPTIONS`
 - `YOUTUBE_TOPIC`
 - `YOUTUBE_MAX_SUBSCRIPTIONS`
@@ -115,6 +123,7 @@ Optional repository variables:
 The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4` to reduce 403s from feeds that throttle GitHub-hosted runners.
 If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
 Before send runs, the workflow runs `npm run feedbin:sync` so Feedbin has subscriptions for Substack feeds and JoBlo. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable that. `FEEDBIN_SYNC_EXTRA_TITLES` defaults to `Joblo` and can be a comma-separated list.
+If `OVERCAST_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run overcast:sync` before building the digest. This reads an Overcast OPML export from `OVERCAST_OPML_BASE64` or `OVERCAST_OPML`, writes an ignored `config/podcast-subscriptions.json`, and the digest loads those generated podcast feeds under the `Podcasts` topic by default. Set `OVERCAST_TOPIC` to route them to another topic, or `OVERCAST_MAX_SUBSCRIPTIONS` to cap the number of synced podcasts.
 If `YOUTUBE_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run youtube:sync` before building the digest. This fetches the authenticated account's YouTube subscriptions, writes an ignored `config/youtube-subscriptions.json`, and the digest loads those generated channel feeds under the `YouTube` topic by default. Set `YOUTUBE_TOPIC` to route them to another topic, or `YOUTUBE_MAX_SUBSCRIPTIONS` to cap the number of synced channels.
 Manual backfills and older dry-runs prefer Feedbin cached entries for feeds with `source: "feedbin"` when Feedbin credentials are configured. This avoids losing items from short rolling public feeds such as GetComics. `FEEDBIN_BACKFILL_AFTER_HOURS` defaults to `6`; set `FEEDBIN_PREFER_FOR_BACKFILLS=false` to force direct RSS fetches for historical windows.
 Scheduled sends fail before Resend if any feeds fail. Set `ALLOW_PARTIAL_DIGEST_SEND=true` only if you want to send incomplete digests.
@@ -169,3 +178,31 @@ npm run digest -- --dry-run --no-ai --no-embeddings
 ```
 
 The generated file is `config/youtube-subscriptions.json`; it is ignored by git.
+
+## Overcast Podcasts
+
+Overcast podcast subscriptions are synced from an OPML export. The workflow does not store an Overcast username or password.
+
+Export OPML from Overcast:
+
+1. Sign in at `https://overcast.fm/account`.
+2. Use the account export link for OPML subscriptions.
+3. Save the file as `overcast.opml`.
+
+Local test:
+
+```bash
+export OVERCAST_OPML_PATH=/path/to/overcast.opml
+npm run overcast:sync
+npm run digest -- --dry-run --no-ai --no-embeddings
+```
+
+GitHub Actions setup:
+
+```bash
+base64 -i overcast.opml -o overcast.opml.b64
+gh secret set OVERCAST_OPML_BASE64 < overcast.opml.b64
+gh variable set OVERCAST_SYNC_SUBSCRIPTIONS --body true
+```
+
+The generated file is `config/podcast-subscriptions.json`; it is ignored by git.

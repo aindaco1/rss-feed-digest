@@ -21,6 +21,10 @@ const OPTIONAL = [
   "ALLOW_PARTIAL_DIGEST_SEND",
   "AI_MAX_CLUSTERS",
   "AI_SUMMARIZE_SINGLE_ARTICLES",
+  "OVERCAST_SYNC_SUBSCRIPTIONS",
+  "OVERCAST_TOPIC",
+  "OVERCAST_MAX_SUBSCRIPTIONS",
+  "OVERCAST_SUBSCRIPTIONS_PATH",
   "YOUTUBE_SYNC_SUBSCRIPTIONS",
   "YOUTUBE_TOPIC",
   "YOUTUBE_MAX_SUBSCRIPTIONS",
@@ -28,9 +32,14 @@ const OPTIONAL = [
 ];
 
 const REQUIRED_FOR_YOUTUBE_SYNC = ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"];
+const OVERCAST_OPML_SOURCES = ["OVERCAST_OPML_BASE64", "OVERCAST_OPML", "OVERCAST_OPML_PATH"];
 const youtubeSyncEnabled = process.env.YOUTUBE_SYNC_SUBSCRIPTIONS === "true";
+const overcastSyncEnabled = process.env.OVERCAST_SYNC_SUBSCRIPTIONS === "true";
 const required = youtubeSyncEnabled ? [...REQUIRED_FOR_SEND, ...REQUIRED_FOR_YOUTUBE_SYNC] : REQUIRED_FOR_SEND;
-const missing = required.filter((name) => !process.env[name]);
+const missing = [
+  ...required.filter((name) => !process.env[name]),
+  ...(overcastSyncEnabled && !OVERCAST_OPML_SOURCES.some((name) => process.env[name]) ? ["one Overcast OPML source"] : [])
+];
 
 console.log("Required for scheduled send:");
 for (const name of REQUIRED_FOR_SEND) {
@@ -45,6 +54,13 @@ for (const name of OPTIONAL) {
 if (youtubeSyncEnabled) {
   console.log("\nRequired for YouTube subscription sync:");
   for (const name of REQUIRED_FOR_YOUTUBE_SYNC) {
+    console.log(`- ${name}: ${process.env[name] ? "set" : "missing"}`);
+  }
+}
+
+if (overcastSyncEnabled) {
+  console.log("\nRequired for Overcast subscription sync:");
+  for (const name of OVERCAST_OPML_SOURCES) {
     console.log(`- ${name}: ${process.env[name] ? "set" : "missing"}`);
   }
 }

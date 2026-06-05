@@ -9,13 +9,14 @@ import { loadConfig } from "../src/config/loadConfig.js";
 test("merges generated subscription feeds when provided", () => {
   const dir = mkdtempSync(join(tmpdir(), "rss-digest-config-"));
   const configPath = join(dir, "feeds.json");
-  const generatedPath = join(dir, "youtube-subscriptions.json");
+  const youtubePath = join(dir, "youtube-subscriptions.json");
+  const podcastPath = join(dir, "podcast-subscriptions.json");
 
   writeFileSync(
     configPath,
     JSON.stringify({
       digest: { title: "Test Digest" },
-      topics: ["Tech", "YouTube"],
+      topics: ["Tech", "YouTube", "Podcasts"],
       feeds: [
         {
           title: "Example",
@@ -28,7 +29,7 @@ test("merges generated subscription feeds when provided", () => {
     })
   );
   writeFileSync(
-    generatedPath,
+    youtubePath,
     JSON.stringify({
       feeds: [
         {
@@ -41,9 +42,26 @@ test("merges generated subscription feeds when provided", () => {
       ]
     })
   );
+  writeFileSync(
+    podcastPath,
+    JSON.stringify({
+      feeds: [
+        {
+          title: "Podcast Show",
+          feedUrl: "https://feeds.example.com/show",
+          siteUrl: "https://example.com/show",
+          topic: "Podcasts",
+          source: "podcast"
+        }
+      ]
+    })
+  );
 
-  const config = loadConfig(pathToFileURL(configPath), { generatedFeedPaths: [pathToFileURL(generatedPath)] });
+  const config = loadConfig(pathToFileURL(configPath), {
+    generatedFeedPaths: [pathToFileURL(youtubePath), pathToFileURL(podcastPath)]
+  });
 
-  assert.equal(config.feeds.length, 2);
+  assert.equal(config.feeds.length, 3);
   assert.equal(config.feeds[1].title, "Video Channel");
+  assert.equal(config.feeds[2].title, "Podcast Show");
 });
