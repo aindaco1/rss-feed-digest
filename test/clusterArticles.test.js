@@ -12,6 +12,7 @@ function article(overrides) {
     topicHint: overrides.topicHint || "Tech",
     publishedAt: overrides.publishedAt || "2026-06-01T12:00:00.000Z",
     sourceName: overrides.sourceName || "Example",
+    sourceType: overrides.sourceType,
     url: overrides.url || `https://example.com/${overrides.id}`,
     imageUrl: null
   };
@@ -545,4 +546,66 @@ test("does not cluster same-source articles unless canonical URLs match", () => 
   ]);
 
   assert.equal(clusters.length, 2);
+});
+
+test("does not cluster related YouTube videos from the same channel", () => {
+  const clusters = clusterArticles([
+    article({
+      id: "a",
+      title: "Apple Vision Pro review after one week",
+      summary: "Apple Vision Pro review with hands on impressions after one week of daily use.",
+      text: "Apple Vision Pro review hands on impressions daily use.",
+      sourceName: "Example Channel",
+      sourceType: "youtube",
+      topicHint: "YouTube"
+    }),
+    article({
+      id: "b",
+      title: "Apple Vision Pro review and hands-on impressions",
+      summary: "Apple Vision Pro review after a week with hands on testing and daily use.",
+      text: "Apple Vision Pro review hands on impressions daily use.",
+      sourceName: "Example Channel",
+      sourceType: "youtube",
+      topicHint: "YouTube"
+    })
+  ]);
+
+  assert.equal(clusters.length, 2);
+  assert.deepEqual(
+    clusters.map((cluster) => cluster.articles.length),
+    [1, 1]
+  );
+});
+
+test("does not cluster YouTube videos through embeddings", () => {
+  const videos = [
+    article({
+      id: "a",
+      title: "Wolverine trailer reaction",
+      summary: "A reaction to the new Wolverine gameplay trailer.",
+      sourceName: "First Channel",
+      sourceType: "youtube",
+      topicHint: "YouTube"
+    }),
+    article({
+      id: "b",
+      title: "Wolverine gameplay breakdown",
+      summary: "A breakdown of the new Wolverine gameplay trailer.",
+      sourceName: "Second Channel",
+      sourceType: "youtube",
+      topicHint: "YouTube"
+    })
+  ];
+  const clusters = clusterArticles(videos, {
+    vectorsById: new Map([
+      ["a", [1, 0, 0]],
+      ["b", [1, 0, 0]]
+    ])
+  });
+
+  assert.equal(clusters.length, 2);
+  assert.deepEqual(
+    clusters.map((cluster) => cluster.articles.length),
+    [1, 1]
+  );
 });

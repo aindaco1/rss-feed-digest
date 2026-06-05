@@ -279,6 +279,7 @@ function numberSetting(optionValue, envName, defaultValue) {
 function similarity(article, articleProfile, cluster, vectorsById, settings) {
   const sameCanonical = cluster.articles.some((candidate) => candidate.canonicalUrl === article.canonicalUrl);
   if (sameCanonical) return 1;
+  if (isStandaloneArticle(article) || cluster.articles.some(isStandaloneArticle)) return 0;
 
   const sameSourceCluster = cluster.articles.every((candidate) => candidate.sourceName === article.sourceName);
 
@@ -416,6 +417,7 @@ function mergeClusters(clusters, settings) {
 }
 
 function clustersCanMerge(left, right, settings) {
+  if (left.articles.some(isStandaloneArticle) || right.articles.some(isStandaloneArticle)) return false;
   if (left.articles.some((article) => isTopicExcluded(article.topicHint, settings.noBroadClusterTopics))) return false;
   if (right.articles.some((article) => isTopicExcluded(article.topicHint, settings.noBroadClusterTopics))) return false;
   if (left.profiles.some((leftProfile) => right.profiles.some((rightProfile) => leftProfile.isCommerce !== rightProfile.isCommerce))) {
@@ -741,6 +743,10 @@ function topicSet(value) {
 
 function isTopicExcluded(topic, excludedTopics) {
   return topic && excludedTopics.has(topic);
+}
+
+function isStandaloneArticle(article) {
+  return article.sourceType === "youtube";
 }
 
 function hash(value) {
