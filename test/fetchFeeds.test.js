@@ -206,9 +206,75 @@ test("falls back to Feedbin when direct and Substack archive fetches are forbidd
   assert.match(requestedUrls[1], /^https:\/\/example\.substack\.com\/api\/v1\/archive\?/);
   assert.equal(requestedUrls[2], "https://api.feedbin.test/v2/subscriptions.json");
   assert.match(requestedUrls[3], /^https:\/\/api\.feedbin\.test\/v2\/feeds\/42\/entries\.json\?/);
+  assert.match(requestedUrls[3], /include_original=true/);
   assert.match(xml, /Feedbin Post/);
   assert.match(xml, /Cached body/);
   assert.match(xml, /images\.example\.com\/feedbin\.jpg/);
+});
+
+test("uses Feedbin original URLs when normalized entry URLs are missing", async () => {
+  const window = {
+    start: new Date("2026-05-30T13:00:00.000Z"),
+    end: new Date("2026-06-01T13:00:00.000Z")
+  };
+
+  const { articles } = await fetchArticles(
+    {
+      feeds: [
+        {
+          title: "Jacobin",
+          feedUrl: "https://jacobinmag.com/feed/",
+          siteUrl: "https://jacobin.com",
+          topic: "Politics",
+          source: "feedbin"
+        }
+      ]
+    },
+    window,
+    {
+      concurrency: 1,
+      now: "2026-06-02T00:00:00.000Z",
+      feedbinBackfillAfterHours: 6,
+      env: {
+        FEEDBIN_EMAIL: "reader@example.com",
+        FEEDBIN_PASSWORD: "password",
+        FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+      },
+      fetchImpl: async (url) => {
+        if (String(url) === "https://api.feedbin.test/v2/subscriptions.json") {
+          return Response.json([
+            {
+              feed_id: 99,
+              title: "Jacobin",
+              feed_url: "https://jacobinmag.com/feed/",
+              site_url: "https://jacobin.com"
+            }
+          ]);
+        }
+
+        if (String(url).startsWith("https://api.feedbin.test/v2/feeds/99/entries.json")) {
+          assert.match(String(url), /include_original=true/);
+          return Response.json([
+            {
+              id: 5249663233,
+              title: "Britain's Sectarian Politics Narrative Is a Dangerous Con",
+              url: null,
+              original: {
+                url: "https://jacobin.com/2026/06/britain-sectarian-politics-narrative"
+              },
+              summary: "Cached summary",
+              content: "<p>Cached body</p>",
+              published: "2026-05-31T18:00:00.000000Z"
+            }
+          ]);
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    }
+  );
+
+  assert.equal(articles[0].url, "https://jacobin.com/2026/06/britain-sectarian-politics-narrative");
 });
 
 test("prefers Feedbin cached entries for historical feedbin backfills", async () => {

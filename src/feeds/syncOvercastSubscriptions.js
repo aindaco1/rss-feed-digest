@@ -5,7 +5,7 @@ import * as cheerio from "cheerio";
 import { mapLimit } from "../util/concurrency.js";
 
 const DEFAULT_OUTPUT_URL = new URL("../../config/podcast-subscriptions.json", import.meta.url);
-const DEFAULT_MAX_EPISODES_PER_FEED = 100;
+const DEFAULT_MAX_EPISODES_PER_FEED = 0;
 const UNAVAILABLE_STATUSES = new Set([404, 410]);
 
 export async function syncOvercastSubscriptions(options = {}) {
@@ -150,7 +150,6 @@ function cleanAttribute(value) {
 
 function overcastEpisodesFromOutline($, feedOutline, options = {}) {
   const maxEpisodesPerFeed = Number(options.maxEpisodesPerFeed ?? DEFAULT_MAX_EPISODES_PER_FEED);
-  if (maxEpisodesPerFeed === 0) return [];
 
   const episodes = [];
   const seen = new Set();

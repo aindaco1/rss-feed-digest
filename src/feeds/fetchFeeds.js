@@ -302,6 +302,7 @@ async function fetchFeedbinFeedAsRss(feedUrl, options = {}) {
   entriesUrl.searchParams.set("per_page", String(options.feedbinPerPage || env.FEEDBIN_PER_PAGE || 100));
   entriesUrl.searchParams.set("mode", "extended");
   entriesUrl.searchParams.set("include_enclosure", "true");
+  entriesUrl.searchParams.set("include_original", "true");
 
   const entries = await fetchFeedbinJson(entriesUrl, options);
   if (!Array.isArray(entries)) {
@@ -497,8 +498,8 @@ function feedbinEntriesToRssXml(subscription, entries) {
 }
 
 function feedbinEntryToRssItem(entry) {
-  const title = entry.title || entry.url || "Untitled";
-  const link = entry.url || "";
+  const link = feedbinEntryUrl(entry);
+  const title = entry.title || link || entry.url || "Untitled";
   const publishedAt = new Date(entry.published || entry.created_at || Date.now());
   const imageUrl = imageFromFeedbinEntry(entry);
   const imageTags = imageUrl
@@ -507,6 +508,18 @@ function feedbinEntryToRssItem(entry) {
   const author = entry.author ? `<author>${escapeXml(entry.author)}</author>` : "";
 
   return `<item><title>${escapeXml(title)}</title><link>${escapeXml(link)}</link><guid isPermaLink="false">${escapeXml(String(entry.id || link))}</guid>${author}<pubDate>${escapeXml(publishedAt.toUTCString())}</pubDate><description>${cdata(entry.summary || "")}</description><content:encoded>${cdata(entry.content || entry.summary || "")}</content:encoded>${imageTags}</item>`;
+}
+
+function feedbinEntryUrl(entry) {
+  return (
+    [
+      entry.url,
+      entry.original?.url,
+      entry.original?.entry_id,
+      entry.json_feed?.url,
+      entry.extracted_articles?.[0]?.url
+    ].find(isWebUrl) || ""
+  );
 }
 
 function imageFromFeedbinEntry(entry) {
@@ -522,6 +535,15 @@ function imageFromFeedbinEntry(entry) {
   }
 
   return null;
+}
+
+function isWebUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function substackPostsToRssXml(feed, posts) {

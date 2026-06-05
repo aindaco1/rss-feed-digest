@@ -75,6 +75,16 @@ test("keeps Overcast episode URLs from all-data OPML", () => {
   ]);
 });
 
+test("keeps all Overcast episodes by default", () => {
+  const feeds = opmlToPodcastFeeds(sampleAllDataOpml, { topic: "Audio" });
+
+  assert.equal(feeds[0].overcastEpisodes.length, 2);
+  assert.deepEqual(
+    feeds[0].overcastEpisodes.map((episode) => episode.overcastUrl),
+    ["https://overcast.fm/+ABC123", "https://overcast.fm/+DEF456"]
+  );
+});
+
 test("reads Overcast OPML from base64, raw text, or file path", () => {
   const dir = mkdtempSync(join(tmpdir(), "rss-digest-opml-"));
   const opmlPath = join(dir, "overcast.opml");
