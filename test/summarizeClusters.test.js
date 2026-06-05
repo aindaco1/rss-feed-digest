@@ -45,6 +45,38 @@ test("uses medium text verbosity for gpt-4.1-mini AI summaries", async () => {
   assert.equal(digest.topics[0].articles[0].headline, "Merged headline");
 });
 
+test("adds Overcast app links for podcast digest articles", async () => {
+  const digest = await summarizeClusters(
+    [
+      {
+        id: "cluster-podcast",
+        topicHint: "Podcasts",
+        latestPublishedAt: "2026-06-01T12:00:00.000Z",
+        articles: [
+          article({
+            id: "podcast",
+            title: "Podcast episode",
+            sourceName: "Podcast Show",
+            sourceType: "podcast",
+            feedUrl: "https://feeds.example.com/show.xml",
+            topicHint: "Podcasts"
+          })
+        ]
+      }
+    ],
+    { topics: ["Podcasts"] },
+    { disableAI: true }
+  );
+
+  const digestArticle = digest.topics[0].articles[0];
+  assert.equal(
+    digestArticle.appUrl,
+    "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml"
+  );
+  assert.equal(digestArticle.appLabel, "Open in Overcast");
+  assert.equal(digestArticle.sources[0].appLabel, "Open in Overcast");
+});
+
 function article(overrides) {
   return {
     id: overrides.id,
@@ -52,7 +84,9 @@ function article(overrides) {
     summary: overrides.summary || "Summary",
     text: overrides.text || "Article text",
     sourceName: overrides.sourceName,
-    topicHint: "Tech",
+    sourceType: overrides.sourceType,
+    feedUrl: overrides.feedUrl,
+    topicHint: overrides.topicHint || "Tech",
     publishedAt: "2026-06-01T12:00:00.000Z",
     url: `https://example.com/${overrides.id}`,
     imageUrl: null

@@ -25,6 +25,7 @@ const styles = {
   cardImageLink: "display:block;text-decoration:none;border:0;line-height:0;",
   sourceLine: "margin:0 0 6px;color:#675f55;font-size:10px;line-height:1.3;text-transform:uppercase;letter-spacing:1px;font-weight:800;",
   articleTitle: "margin:0 0 7px;color:#111;font-size:16px;line-height:1.2;font-weight:900;letter-spacing:0;",
+  appLinkLine: "margin:-2px 0 8px;color:#4b443d;font-size:12px;line-height:1.35;font-weight:800;",
   summary: "margin:0 0 9px;color:#262626;font-size:13px;line-height:1.38;",
   sourceLinks: "margin:0;padding:8px 0 0;border-top:1px solid #d8d2c8;color:#4b443d;font-size:11px;line-height:1.45;",
   sourceLinksLabel: "font-weight:800;color:#2b2824;",
@@ -51,9 +52,15 @@ function renderSources(sources = []) {
       const label = isCombined && source.title ? `${sourceName}: ${source.title}` : sourceName;
       const name = escapeHtml(label);
       const url = source.url || source.link;
-      return url
+      const sourceLink = url
         ? `<a href="${escapeHtml(url)}" style="${styles.link}">${name}</a>`
         : name;
+      const appLink = source.appUrl
+        ? ` <span style="color:#7a7167;">&middot;</span> <a href="${escapeHtml(source.appUrl)}" style="${styles.link}">${escapeHtml(
+            source.appLabel || "Open in app"
+          )}</a>`
+        : "";
+      return `${sourceLink}${appLink}`;
     })
     .join(isCombined ? "<br>" : " &middot; ");
 
@@ -93,6 +100,7 @@ function renderArticle(article) {
         <h2 style="${styles.articleTitle}">
           ${article.url ? `<a href="${escapeHtml(article.url)}" style="${styles.link}">${escapeHtml(article.headline)}</a>` : escapeHtml(article.headline)}
         </h2>
+        ${article.appUrl ? `<p style="${styles.appLinkLine}"><a href="${escapeHtml(article.appUrl)}" style="${styles.link}">${escapeHtml(article.appLabel || "Open in app")}</a></p>` : ""}
         <p style="${styles.summary}">${escapeHtml(summary)}</p>
         ${renderSources(sources)}
       </div>

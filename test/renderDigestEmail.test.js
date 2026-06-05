@@ -69,3 +69,35 @@ test("renders combined article sources in heading and original article links", (
   assert.match(html, /The Verge: Original Verge story/);
   assert.match(html, /Ars Technica: Original Ars story/);
 });
+
+test("renders app links for articles and sources", () => {
+  const html = renderDigestEmail({
+    dateLabel: "06/01/2026",
+    topics: [
+      {
+        name: "Podcasts",
+        articles: [
+          {
+            headline: "Podcast episode",
+            summary: "A new episode.",
+            url: "https://example.com/episode",
+            appUrl: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml",
+            appLabel: "Open in Overcast",
+            sources: [
+              {
+                name: "Podcast Show",
+                title: "Podcast episode",
+                url: "https://example.com/episode",
+                appUrl: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml",
+                appLabel: "Open in Overcast"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.match(html, /Open in Overcast/);
+  assert.match(html, /overcast:\/\/x-callback-url\/add\?url=https%3A%2F%2Ffeeds\.example\.com%2Fshow\.xml/);
+});

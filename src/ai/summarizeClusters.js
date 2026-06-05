@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { mapLimit } from "../util/concurrency.js";
+import { appLinkForArticle } from "../util/appLinks.js";
 
 export async function summarizeClusters(clusters, config, options = {}) {
   const topicOrder = config.topics;
@@ -50,6 +51,7 @@ function fallbackDigestArticle(cluster) {
   const lead = articles[0];
   const sourceNames = [...new Set(articles.map((article) => article.sourceName))];
   const multiSourceLead = sourceNames.length > 1 ? `Coverage from ${sourceNames.join(", ")}. ` : "";
+  const appLink = appLinkForArticle(lead);
 
   return {
     id: cluster.id,
@@ -57,15 +59,22 @@ function fallbackDigestArticle(cluster) {
     topic: cluster.topicHint,
     summary: `${multiSourceLead}${lead.summary || lead.text.slice(0, 300)}`.slice(0, 900),
     url: lead.url,
+    appUrl: appLink?.url || null,
+    appLabel: appLink?.label || null,
     imageUrl: articles.find((article) => article.imageUrl)?.imageUrl || null,
     imageAlt: lead.title,
     latestPublishedAt: cluster.latestPublishedAt,
-    sources: articles.map((article) => ({
-      name: article.sourceName,
-      title: article.title,
-      url: article.url,
-      publishedAt: article.publishedAt
-    }))
+    sources: articles.map((article) => {
+      const sourceAppLink = appLinkForArticle(article);
+      return {
+        name: article.sourceName,
+        title: article.title,
+        url: article.url,
+        appUrl: sourceAppLink?.url || null,
+        appLabel: sourceAppLink?.label || null,
+        publishedAt: article.publishedAt
+      };
+    })
   };
 }
 
