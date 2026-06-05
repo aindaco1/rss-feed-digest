@@ -277,6 +277,58 @@ test("uses Feedbin original URLs when normalized entry URLs are missing", async 
   assert.equal(articles[0].url, "https://jacobin.com/2026/06/britain-sectarian-politics-narrative");
 });
 
+test("allows feedbin feeds to opt out of Feedbin backfill preference", async () => {
+  const requestedUrls = [];
+  const window = {
+    start: new Date("2026-05-30T13:00:00.000Z"),
+    end: new Date("2026-06-01T13:00:00.000Z")
+  };
+
+  const { articles } = await fetchArticles(
+    {
+      feeds: [
+        {
+          title: "Jacobin",
+          feedUrl: "https://jacobinmag.com/feed/",
+          siteUrl: "https://jacobin.com",
+          topic: "Politics",
+          source: "feedbin",
+          preferFeedbinBackfill: false
+        }
+      ]
+    },
+    window,
+    {
+      concurrency: 1,
+      now: "2026-06-02T00:00:00.000Z",
+      feedbinBackfillAfterHours: 6,
+      env: {
+        FEEDBIN_EMAIL: "reader@example.com",
+        FEEDBIN_PASSWORD: "password",
+        FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+      },
+      fetchImpl: async (url) => {
+        requestedUrls.push(String(url));
+        assert.equal(String(url), "https://jacobinmag.com/feed/");
+        return new Response(`<?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <item>
+                <title>Direct Jacobin article</title>
+                <link>https://jacobin.com/2026/06/direct-jacobin-article</link>
+                <pubDate>Sun, 31 May 2026 18:00:00 GMT</pubDate>
+                <description>Direct summary</description>
+              </item>
+            </channel>
+          </rss>`);
+      }
+    }
+  );
+
+  assert.deepEqual(requestedUrls, ["https://jacobinmag.com/feed/"]);
+  assert.equal(articles[0].url, "https://jacobin.com/2026/06/direct-jacobin-article");
+});
+
 test("prefers Feedbin cached entries for historical feedbin backfills", async () => {
   const requestedUrls = [];
   const window = {

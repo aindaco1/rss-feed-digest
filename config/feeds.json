@@ -167,7 +167,8 @@
       "feedUrl": "https://jacobinmag.com/feed/",
       "siteUrl": "https://jacobin.com",
       "topic": "Politics",
-      "source": "feedbin"
+      "source": "feedbin",
+      "preferFeedbinBackfill": false
     },
     {
       "title": "Vox World",

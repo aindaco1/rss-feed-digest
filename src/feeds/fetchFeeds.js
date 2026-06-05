@@ -398,6 +398,7 @@ function shouldPreferFeedbinForWindow(feed, window, options = {}) {
   const env = options.env || process.env;
   if (env.FEEDBIN_PREFER_FOR_BACKFILLS === "false") return false;
   if (feed.source !== "feedbin" || !hasFeedbinCredentials(options)) return false;
+  if (feed.preferFeedbinBackfill === false) return false;
   if (options.preferFeedbin) return true;
 
   const backfillAfterHours = Number(options.feedbinBackfillAfterHours ?? env.FEEDBIN_BACKFILL_AFTER_HOURS ?? 6);
