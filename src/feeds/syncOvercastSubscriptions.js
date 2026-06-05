@@ -2,8 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as cheerio from "cheerio";
+import { mapLimit } from "../util/concurrency.js";
 
 const DEFAULT_OUTPUT_URL = new URL("../../config/podcast-subscriptions.json", import.meta.url);
+const UNAVAILABLE_STATUSES = new Set([404, 410]);
 
 export async function syncOvercastSubscriptions(options = {}) {
   const env = options.env || process.env;
@@ -12,16 +14,26 @@ export async function syncOvercastSubscriptions(options = {}) {
   const maxSubscriptions = Number(options.maxSubscriptions || env.OVERCAST_MAX_SUBSCRIPTIONS || 0);
   const opml = options.opml || readOvercastOpml(env);
   const feeds = opmlToPodcastFeeds(opml, { topic, maxSubscriptions });
+  const { activeFeeds, skippedFeeds } =
+    options.skipUnavailable === false || env.OVERCAST_SKIP_UNAVAILABLE === "false"
+      ? { activeFeeds: feeds, skippedFeeds: [] }
+      : await filterUnavailablePodcastFeeds(feeds, {
+          fetchImpl: options.fetchImpl || fetch,
+          concurrency: Number(options.checkConcurrency || env.OVERCAST_CHECK_CONCURRENCY || 5),
+          timeoutMs: Number(options.timeoutMs || env.OVERCAST_CHECK_TIMEOUT_MS || 8000)
+        });
 
   writeJson(outputPath, {
     generatedAt: new Date().toISOString(),
     source: "overcast-opml",
-    feeds
+    feeds: activeFeeds,
+    skippedFeeds
   });
 
   return {
     outputPath,
-    feedCount: feeds.length
+    feedCount: activeFeeds.length,
+    skippedCount: skippedFeeds.length
   };
 }
 
@@ -83,6 +95,48 @@ export function readOvercastOpml(env = process.env) {
   throw new Error("Set OVERCAST_OPML_BASE64, OVERCAST_OPML, or OVERCAST_OPML_PATH before running Overcast sync.");
 }
 
+async function filterUnavailablePodcastFeeds(feeds, options = {}) {
+  const checks = await mapLimit(feeds, options.concurrency || 5, async (feed) => {
+    const unavailable = await unavailablePodcastFeed(feed, options);
+    return { feed, unavailable };
+  });
+
+  return {
+    activeFeeds: checks.filter((check) => !check.unavailable).map((check) => check.feed),
+    skippedFeeds: checks
+      .filter((check) => check.unavailable)
+      .map((check) => ({
+        title: check.feed.title,
+        feedUrl: check.feed.feedUrl,
+        reason: check.unavailable
+      }))
+  };
+}
+
+async function unavailablePodcastFeed(feed, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 8000);
+  const fetchImpl = options.fetchImpl || fetch;
+
+  try {
+    const response = await fetchImpl(feed.feedUrl, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+        "user-agent": process.env.FEED_USER_AGENT || "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)"
+      }
+    });
+
+    await response.body?.cancel?.();
+    return UNAVAILABLE_STATUSES.has(response.status) ? `Status code ${response.status}` : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function cleanAttribute(value) {
   return String(value || "").trim();
 }
@@ -132,6 +186,9 @@ function writeJson(outputPath, payload) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = await syncOvercastSubscriptions();
+    if (result.skippedCount) {
+      console.log(`Skipped ${result.skippedCount} unavailable podcast subscription feed(s).`);
+    }
     console.log(`Wrote ${result.feedCount} podcast subscription feed(s) to ${pathString(result.outputPath)}.`);
   } catch (error) {
     console.error(error.message);

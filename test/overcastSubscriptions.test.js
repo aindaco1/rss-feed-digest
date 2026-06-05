@@ -64,3 +64,42 @@ test("syncs Overcast OPML to generated podcast feed config", async () => {
   assert.equal(generated.feeds.length, 1);
   assert.equal(generated.feeds[0].title, "Second Show");
 });
+
+test("skips definitely unavailable Overcast podcast feeds", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rss-digest-overcast-"));
+  const outputPath = join(dir, "podcast-subscriptions.json");
+  const opml = `<?xml version="1.0"?>
+    <opml version="1.0">
+      <body>
+        <outline text="Live Show" xmlUrl="https://feeds.example.com/live.xml" />
+        <outline text="Dead Show" xmlUrl="https://feeds.example.com/dead.xml" />
+      </body>
+    </opml>`;
+
+  const result = await syncOvercastSubscriptions({
+    outputPath,
+    opml,
+    fetchImpl: async (url) => {
+      if (String(url) === "https://feeds.example.com/dead.xml") {
+        return new Response("Not found", { status: 404 });
+      }
+
+      return new Response("<?xml version=\"1.0\"?><rss></rss>", { status: 200 });
+    }
+  });
+  const generated = JSON.parse(readFileSync(outputPath, "utf8"));
+
+  assert.equal(result.feedCount, 1);
+  assert.equal(result.skippedCount, 1);
+  assert.deepEqual(
+    generated.feeds.map((feed) => feed.title),
+    ["Live Show"]
+  );
+  assert.deepEqual(generated.skippedFeeds, [
+    {
+      title: "Dead Show",
+      feedUrl: "https://feeds.example.com/dead.xml",
+      reason: "Status code 404"
+    }
+  ]);
+});
