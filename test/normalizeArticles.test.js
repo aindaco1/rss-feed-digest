@@ -140,6 +140,44 @@ test("uses media group descriptions and thumbnails for video feeds", () => {
   assert.equal(articles[0].imageUrl, "https://i.ytimg.com/vi/video-id/hqdefault.jpg");
 });
 
+test("strips redundant YouTube URLs from YouTube summaries", () => {
+  const articles = normalizeFeedItems(
+    {
+      ...feed,
+      title: "YouTube Test",
+      feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123",
+      source: "youtube"
+    },
+    {
+      items: [
+        {
+          title: "A live episode",
+          link: "https://www.youtube.com/live/DHBg5kW-voA",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          mediaGroup: {
+            "media:description": [
+              "Watch the rest of this monumental meeting at https://www.youtube.com/live/DHBg5kW-voA?si=abc123 Support the show."
+            ]
+          }
+        },
+        {
+          title: "A short clip",
+          link: "https://youtu.be/video-id",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          mediaGroup: {
+            "media:description": ["A short clip https://youtu.be/video-id"]
+          }
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles[0].url, "https://www.youtube.com/live/DHBg5kW-voA");
+  assert.equal(articles[0].summary, "Watch the rest of this monumental meeting. Support the show.");
+  assert.equal(articles[1].summary, "A short clip");
+});
+
 test("filters feed items by required title text", () => {
   const articles = normalizeFeedItems(
     { ...feed, titleIncludes: "1080p" },

@@ -55,7 +55,8 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
   const contentHtml = item.contentEncoded || item["content:encoded"] || item.content || item.description || "";
   const text = stripFeedBoilerplate(htmlToText(contentHtml), { title: rawTitle });
   const summarySource = item.contentSnippet || item.summary || item.description || mediaDescriptionFromItem(item) || text;
-  const summary = (stripFeedBoilerplate(textFromMaybeHtml(summarySource), { title: rawTitle }) || text).slice(0, 1200);
+  const rawSummary = stripFeedBoilerplate(textFromMaybeHtml(summarySource), { title: rawTitle });
+  const summary = cleanArticleSummary(rawSummary || text, feedConfig).slice(0, 1200);
 
   if (feedConfig.excludeSponsored && isLikelySponsoredPost({ title: rawTitle, summary, text, contentHtml })) return null;
 
@@ -100,6 +101,38 @@ function canonicalizeUrl(rawUrl) {
     return url.toString();
   } catch {
     return rawUrl;
+  }
+}
+
+function cleanArticleSummary(summary, feedConfig) {
+  const cleaned = cleanWhitespace(summary);
+  return isYouTubeFeed(feedConfig) ? stripYouTubeUrlsFromSummary(cleaned) : cleaned;
+}
+
+function isYouTubeFeed(feedConfig) {
+  return feedConfig.source === "youtube" || /(?:^|\.)youtube\.com$/i.test(hostnameFromUrl(feedConfig.feedUrl));
+}
+
+function stripYouTubeUrlsFromSummary(summary) {
+  const youtubeUrlPattern = /\s+(?:at\s*:?\s*)?https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\/\S+/gi;
+
+  return cleanWhitespace(
+    summary
+      .replace(youtubeUrlPattern, (match, offset, input) => {
+        const before = input.slice(0, offset).trimEnd();
+        const after = input.slice(offset + match.length).trimStart();
+        return before && after && !/[.!?]$/.test(before) ? ". " : " ";
+      })
+      .replace(/\s+([.,!?;:])/g, "$1")
+      .replace(/\s+(?:at|watch(?:\s+(?:it|here|the\s+rest))?|full\s+video|link(?:ed)?)\s*:?\s*$/i, "")
+  );
+}
+
+function hostnameFromUrl(rawUrl) {
+  try {
+    return new URL(rawUrl).hostname;
+  } catch {
+    return "";
   }
 }
 
