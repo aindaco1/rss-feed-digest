@@ -9,7 +9,7 @@ test("builds Overcast app links from podcast feed URLs", () => {
       feedUrl: "https://feeds.example.com/show.xml"
     }),
     {
-      label: "Open in Overcast",
+      label: "Subscribe in Overcast",
       url: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml"
     }
   );

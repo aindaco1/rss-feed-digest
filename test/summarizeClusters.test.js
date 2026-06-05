@@ -73,8 +73,8 @@ test("adds Overcast app links for podcast digest articles", async () => {
     digestArticle.appUrl,
     "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml"
   );
-  assert.equal(digestArticle.appLabel, "Open in Overcast");
-  assert.equal(digestArticle.sources[0].appLabel, "Open in Overcast");
+  assert.equal(digestArticle.appLabel, "Subscribe in Overcast");
+  assert.equal(digestArticle.sources[0].appLabel, "Subscribe in Overcast");
 });
 
 function article(overrides) {

@@ -36,7 +36,8 @@ test("renders digest header, topics, article metadata, and escaped text", () => 
   assert.match(html, /Summary &amp; context/);
   assert.match(html, /The Verge/);
   assert.match(html, /class="digest-grid"/);
-  assert.match(html, /width="50%" valign="top"/);
+  assert.match(html, /width="49%" valign="top"/);
+  assert.match(html, /class="digest-column-spacer" width="2%"/);
   assert.match(html, /min-width: 421px/);
   assert.match(html, /max-width: 420px/);
   assert.doesNotMatch(html, /max-width: 640px/);
@@ -82,14 +83,14 @@ test("renders app links for articles and sources", () => {
             summary: "A new episode.",
             url: "https://example.com/episode",
             appUrl: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml",
-            appLabel: "Open in Overcast",
+            appLabel: "Subscribe in Overcast",
             sources: [
               {
                 name: "Podcast Show",
                 title: "Podcast episode",
                 url: "https://example.com/episode",
                 appUrl: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml",
-                appLabel: "Open in Overcast"
+                appLabel: "Subscribe in Overcast"
               }
             ]
           }
@@ -98,7 +99,7 @@ test("renders app links for articles and sources", () => {
     ]
   });
 
-  assert.match(html, /Open in Overcast/);
+  assert.match(html, /Subscribe in Overcast/);
   assert.match(html, /overcast:\/\/x-callback-url\/add\?url=https%3A%2F%2Ffeeds\.example\.com%2Fshow\.xml/);
 });
 
@@ -172,11 +173,11 @@ test("balances desktop columns by estimated article height", () => {
 
 function desktopColumns(html) {
   const leftMarker =
-    '<td class="digest-column" width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 6px 0 0;">';
+    '<td class="digest-column digest-column-half" width="49%" valign="top" style="width:49%;vertical-align:top;padding:0;">';
   const rightMarker =
-    '<td class="digest-column" width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 0 0 6px;">';
+    '<td class="digest-column digest-column-half" width="49%" valign="top" style="width:49%;vertical-align:top;padding:0;">';
   const leftStart = html.indexOf(leftMarker);
-  const rightStart = html.indexOf(rightMarker, leftStart);
+  const rightStart = html.indexOf(rightMarker, leftStart + leftMarker.length);
   const rightEnd = html.indexOf("</td>", rightStart);
 
   assert.notEqual(leftStart, -1, "Expected rendered left desktop column");

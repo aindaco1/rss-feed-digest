@@ -28,19 +28,19 @@ const styles = {
   topicTitle: "margin:0;color:#fff;font-size:24px;line-height:1;font-weight:900;letter-spacing:0;",
   topicRule: "height:3px;background:#f05a28;border:0;margin:10px 0 0;width:58px;",
   topicGridWrap: "padding:0 22px 12px;",
-  topicGrid: "width:100%;border-collapse:collapse;border-spacing:0;",
-  columnLeft: "width:50%;vertical-align:top;padding:0 6px 0 0;",
-  columnRight: "width:50%;vertical-align:top;padding:0 0 0 6px;",
+  topicGrid: "width:100%;border-collapse:collapse;border-spacing:0;table-layout:fixed;",
+  columnHalf: "width:49%;vertical-align:top;padding:0;",
+  columnSpacer: "width:2%;font-size:0;line-height:0;padding:0;",
   columnFull: "width:100%;vertical-align:top;padding:0;",
-  card: "background:#f4f1ea;color:#141414;border:1px solid #e2ded5;margin:0 0 12px;border-radius:7px;overflow:hidden;",
+  card: "background:#f4f1ea;color:#141414;border:1px solid #e2ded5;margin:0 0 12px;border-radius:7px;overflow:hidden;word-break:break-word;overflow-wrap:break-word;word-wrap:break-word;",
   cardBody: "padding:11px 12px 12px;",
   cardImage: "display:block;width:100%;height:108px;object-fit:cover;border:0;background:#ded8ce;",
   cardImageLink: "display:block;text-decoration:none;border:0;line-height:0;",
-  sourceLine: "margin:0 0 6px;color:#675f55;font-size:10px;line-height:1.3;text-transform:uppercase;letter-spacing:1px;font-weight:800;",
-  articleTitle: "margin:0 0 7px;color:#111;font-size:16px;line-height:1.2;font-weight:900;letter-spacing:0;",
+  sourceLine: "margin:0 0 6px;color:#675f55;font-size:10px;line-height:1.3;text-transform:uppercase;letter-spacing:1px;font-weight:800;word-break:break-word;overflow-wrap:break-word;word-wrap:break-word;",
+  articleTitle: "margin:0 0 7px;color:#111;font-size:16px;line-height:1.2;font-weight:900;letter-spacing:0;word-break:break-word;overflow-wrap:break-word;word-wrap:break-word;",
   appLinkLine: "margin:-2px 0 8px;color:#4b443d;font-size:12px;line-height:1.35;font-weight:800;",
-  summary: "margin:0 0 9px;color:#262626;font-size:13px;line-height:1.38;",
-  sourceLinks: "margin:0;padding:8px 0 0;border-top:1px solid #d8d2c8;color:#4b443d;font-size:11px;line-height:1.45;",
+  summary: "margin:0 0 9px;color:#262626;font-size:13px;line-height:1.38;word-break:break-word;overflow-wrap:break-word;word-wrap:break-word;",
+  sourceLinks: "margin:0;padding:8px 0 0;border-top:1px solid #d8d2c8;color:#4b443d;font-size:11px;line-height:1.45;word-break:break-word;overflow-wrap:break-word;word-wrap:break-word;",
   sourceLinksLabel: "font-weight:800;color:#2b2824;",
   link: "color:#111;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;",
   footer: "padding:20px 28px 26px;color:#90887f;font-size:12px;line-height:1.45;border-top:1px solid #383838;"
@@ -191,7 +191,7 @@ function renderArticleColumns(articles) {
   if (articles.length === 1) {
     return `<table class="digest-grid" role="presentation" cellspacing="0" cellpadding="0" border="0" style="${styles.topicGrid}">
       <tr>
-        <td class="digest-column" style="${styles.columnFull}">${renderArticle(articles[0])}</td>
+        <td class="digest-column digest-column-full" style="${styles.columnFull}">${renderArticle(articles[0])}</td>
       </tr>
     </table>`;
   }
@@ -200,10 +200,11 @@ function renderArticleColumns(articles) {
 
   return `<table class="digest-grid" role="presentation" cellspacing="0" cellpadding="0" border="0" style="${styles.topicGrid}">
     <tr>
-      <td class="digest-column" width="50%" valign="top" style="${styles.columnLeft}">
+      <td class="digest-column digest-column-half" width="49%" valign="top" style="${styles.columnHalf}">
         ${left.map(renderArticle).join("\n")}
       </td>
-      <td class="digest-column" width="50%" valign="top" style="${styles.columnRight}">
+      <td class="digest-column-spacer" width="2%" style="${styles.columnSpacer}">&nbsp;</td>
+      <td class="digest-column digest-column-half" width="49%" valign="top" style="${styles.columnHalf}">
         ${right.map(renderArticle).join("\n")}
       </td>
     </tr>
@@ -239,11 +240,13 @@ export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, 
     <title>${escapeHtml(title)} - ${escapeHtml(dateLabel)}</title>
     <style>
       @media screen and (min-width: 421px) {
-        .digest-column { display: table-cell !important; width: 50% !important; }
+        .digest-column-half { display: table-cell !important; width: 49% !important; }
+        .digest-column-spacer { display: table-cell !important; width: 2% !important; }
       }
       @media screen and (max-width: 420px) {
         .digest-container { width: 100% !important; max-width: 100% !important; }
         .digest-column { display: block !important; width: 100% !important; padding: 0 !important; }
+        .digest-column-spacer { display: none !important; width: 0 !important; height: 0 !important; overflow: hidden !important; }
         .digest-card-img { height: auto !important; }
       }
     </style>

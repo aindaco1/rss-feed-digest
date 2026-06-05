@@ -1,7 +1,7 @@
 export function appLinkForArticle(article, env = process.env) {
   if (article?.sourceType === "podcast" && article.feedUrl) {
     return {
-      label: "Open in Overcast",
+      label: "Subscribe in Overcast",
       url: `overcast://x-callback-url/add?url=${encodeURIComponent(article.feedUrl)}`
     };
   }

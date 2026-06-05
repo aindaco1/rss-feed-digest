@@ -182,7 +182,7 @@ npm run digest -- --dry-run --no-ai --no-embeddings
 
 The generated file is `config/youtube-subscriptions.json`; it is ignored by git.
 
-Digest podcast cards include an `Open in Overcast` link using Overcast's iOS URL scheme for the podcast RSS feed. YouTube cards keep their normal web links unless `VIDEO_LITE_URL_TEMPLATE` is set. The template supports `{url}`, `{encodedUrl}`, and `{videoId}` placeholders, for example `someapp://open?url={encodedUrl}`. Video Lite does not publish a URL scheme in its public docs, so do not set this until you have a confirmed working scheme.
+Digest podcast cards include a `Subscribe in Overcast` link using Overcast's iOS URL scheme for the podcast RSS feed. Overcast documents this as a subscribe prompt, not a deep link to open a specific episode. YouTube cards keep their normal web links unless `VIDEO_LITE_URL_TEMPLATE` is set. The template supports `{url}`, `{encodedUrl}`, and `{videoId}` placeholders, for example `someapp://open?url={encodedUrl}`. Video Lite does not publish a URL scheme in its public docs, so do not set this until you have a confirmed working scheme.
 
 ## Overcast Podcasts
 
