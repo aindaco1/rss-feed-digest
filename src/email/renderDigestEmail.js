@@ -1,6 +1,19 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const SUMMARY_LIMIT = 280;
+const CARD_ESTIMATE = {
+  base: 42,
+  image: 108,
+  sourceHeading: 20,
+  titleLine: 19,
+  summaryLine: 18,
+  appLink: 18,
+  sourceLinksBase: 24,
+  sourceLinkLine: 14,
+  titleCharsPerLine: 24,
+  summaryCharsPerLine: 34,
+  sourceCharsPerLine: 42
+};
 
 const styles = {
   page: "margin:0;padding:0;background:#0f0f0f;color:#f6f1e8;font-family:Arial,Helvetica,sans-serif;",
@@ -125,11 +138,52 @@ function compactSummary(value = "") {
   return `${truncated}...`;
 }
 
+function estimatedLineCount(value, charsPerLine, minLines = 0) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return minLines;
+  return Math.max(minLines, Math.ceil(text.length / charsPerLine));
+}
+
+function estimateArticleHeight(article) {
+  const sources = article.sources || [];
+  const sourceHeading = renderSourceHeading(sources);
+  let estimate = CARD_ESTIMATE.base;
+
+  if (article.imageUrl) estimate += CARD_ESTIMATE.image;
+  if (sourceHeading) estimate += CARD_ESTIMATE.sourceHeading;
+
+  const titleLines = estimatedLineCount(article.headline, CARD_ESTIMATE.titleCharsPerLine, 1);
+  const summaryLines = estimatedLineCount(compactSummary(article.summary), CARD_ESTIMATE.summaryCharsPerLine, 1);
+  estimate += titleLines * CARD_ESTIMATE.titleLine;
+  estimate += summaryLines * CARD_ESTIMATE.summaryLine;
+
+  if (article.appUrl) estimate += CARD_ESTIMATE.appLink;
+
+  if (sources.length) {
+    const sourceText = sources
+      .map((source) =>
+        [source.name || source.site || "Source", source.title, source.appLabel].filter(Boolean).join(" ")
+      )
+      .join(" ");
+    const sourceLines = Math.max(sources.length, estimatedLineCount(sourceText, CARD_ESTIMATE.sourceCharsPerLine, 1));
+    estimate += CARD_ESTIMATE.sourceLinksBase + sourceLines * CARD_ESTIMATE.sourceLinkLine;
+  }
+
+  return estimate;
+}
+
 function splitColumns(articles) {
   const columns = [[], []];
+
+  if (!articles.length) return columns;
+
+  const heights = [0, 0];
   articles.forEach((article, index) => {
-    columns[index % 2].push(article);
+    const columnIndex = index === 0 ? 0 : heights[0] <= heights[1] ? 0 : 1;
+    columns[columnIndex].push(article);
+    heights[columnIndex] += estimateArticleHeight(article);
   });
+
   return columns;
 }
 

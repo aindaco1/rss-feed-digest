@@ -126,3 +126,65 @@ test("does not render non-web article or source URLs as links", () => {
   assert.doesNotMatch(html, /href="episode-guid"/);
   assert.doesNotMatch(html, /href="source-guid"/);
 });
+
+test("balances desktop columns by estimated article height", () => {
+  const html = renderDigestEmail({
+    dateLabel: "06/01/2026",
+    topics: [
+      {
+        name: "Tech",
+        articles: [
+          {
+            headline: "Tall first story with a deliberately long headline that wraps across several lines",
+            summary:
+              "This first item has an image and a longer body. It should be estimated as much taller than the following short cards so the next two articles are placed in the right column instead of alternating the third article back to the left column.",
+            url: "https://example.com/tall",
+            imageUrl: "https://images.example.com/tall.jpg",
+            sources: [
+              { name: "Source One", title: "Tall source story", url: "https://example.com/tall/source-one" },
+              { name: "Source Two", title: "Another tall source story", url: "https://example.com/tall/source-two" }
+            ]
+          },
+          {
+            headline: "Short second story",
+            summary: "Brief summary.",
+            url: "https://example.com/short-second",
+            sources: [{ name: "Source Three", url: "https://example.com/short-second" }]
+          },
+          {
+            headline: "Short third story",
+            summary: "Brief summary.",
+            url: "https://example.com/short-third",
+            sources: [{ name: "Source Four", url: "https://example.com/short-third" }]
+          }
+        ]
+      }
+    ]
+  });
+
+  const { left, right } = desktopColumns(html);
+  assert.match(left, /Tall first story/);
+  assert.doesNotMatch(left, /Short second story/);
+  assert.doesNotMatch(left, /Short third story/);
+  assert.match(right, /Short second story/);
+  assert.match(right, /Short third story/);
+});
+
+function desktopColumns(html) {
+  const leftMarker =
+    '<td class="digest-column" width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 6px 0 0;">';
+  const rightMarker =
+    '<td class="digest-column" width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 0 0 6px;">';
+  const leftStart = html.indexOf(leftMarker);
+  const rightStart = html.indexOf(rightMarker, leftStart);
+  const rightEnd = html.indexOf("</td>", rightStart);
+
+  assert.notEqual(leftStart, -1, "Expected rendered left desktop column");
+  assert.notEqual(rightStart, -1, "Expected rendered right desktop column");
+  assert.notEqual(rightEnd, -1, "Expected right desktop column end");
+
+  return {
+    left: html.slice(leftStart + leftMarker.length, rightStart),
+    right: html.slice(rightStart + rightMarker.length, rightEnd)
+  };
+}
