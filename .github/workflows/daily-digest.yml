@@ -51,6 +51,8 @@ jobs:
       OVERCAST_SYNC_SUBSCRIPTIONS: ${{ vars.OVERCAST_SYNC_SUBSCRIPTIONS || 'false' }}
       OVERCAST_TOPIC: ${{ vars.OVERCAST_TOPIC || 'Podcasts' }}
       OVERCAST_MAX_SUBSCRIPTIONS: ${{ vars.OVERCAST_MAX_SUBSCRIPTIONS || '0' }}
+      OVERCAST_MAX_EPISODES_PER_FEED: ${{ vars.OVERCAST_MAX_EPISODES_PER_FEED || '100' }}
+      OVERCAST_OPML_ENCRYPTED_PATH: ${{ vars.OVERCAST_OPML_ENCRYPTED_PATH || 'config/overcast-all-data.opml.gpg' }}
       OVERCAST_SKIP_UNAVAILABLE: ${{ vars.OVERCAST_SKIP_UNAVAILABLE || 'true' }}
       OVERCAST_CHECK_CONCURRENCY: ${{ vars.OVERCAST_CHECK_CONCURRENCY || '5' }}
       YOUTUBE_SYNC_SUBSCRIPTIONS: ${{ vars.YOUTUBE_SYNC_SUBSCRIPTIONS || 'false' }}
@@ -113,6 +115,30 @@ jobs:
       - name: Validate feed config
         if: steps.mode.outputs.should_run == 'true'
         run: npm run validate:feeds
+
+      - name: Decrypt Overcast all-data OPML
+        if: steps.mode.outputs.should_run == 'true' && env.OVERCAST_SYNC_SUBSCRIPTIONS == 'true'
+        env:
+          OVERCAST_OPML_GPG_PASSPHRASE: ${{ secrets.OVERCAST_OPML_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          if [[ ! -f "${OVERCAST_OPML_ENCRYPTED_PATH}" ]]; then
+            echo "No encrypted Overcast OPML found at ${OVERCAST_OPML_ENCRYPTED_PATH}; using configured OPML secrets if present."
+            exit 0
+          fi
+
+          if [[ -z "${OVERCAST_OPML_GPG_PASSPHRASE}" ]]; then
+            echo "::error::OVERCAST_OPML_GPG_PASSPHRASE is required to decrypt ${OVERCAST_OPML_ENCRYPTED_PATH}."
+            exit 1
+          fi
+
+          decrypted_path="${RUNNER_TEMP}/overcast-all-data.opml"
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${OVERCAST_OPML_GPG_PASSPHRASE}" \
+            --output "${decrypted_path}" \
+            --decrypt "${OVERCAST_OPML_ENCRYPTED_PATH}"
+
+          echo "OVERCAST_OPML_PATH=${decrypted_path}" >> "${GITHUB_ENV}"
 
       - name: Check send environment
         if: steps.mode.outputs.should_run == 'true' && steps.mode.outputs.send == 'true'

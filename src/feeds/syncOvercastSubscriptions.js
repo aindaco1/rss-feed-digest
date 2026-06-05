@@ -5,6 +5,7 @@ import * as cheerio from "cheerio";
 import { mapLimit } from "../util/concurrency.js";
 
 const DEFAULT_OUTPUT_URL = new URL("../../config/podcast-subscriptions.json", import.meta.url);
+const DEFAULT_MAX_EPISODES_PER_FEED = 100;
 const UNAVAILABLE_STATUSES = new Set([404, 410]);
 
 export async function syncOvercastSubscriptions(options = {}) {
@@ -12,8 +13,11 @@ export async function syncOvercastSubscriptions(options = {}) {
   const outputPath = options.outputPath || env.OVERCAST_SUBSCRIPTIONS_PATH || DEFAULT_OUTPUT_URL;
   const topic = options.topic || env.OVERCAST_TOPIC || "Podcasts";
   const maxSubscriptions = Number(options.maxSubscriptions || env.OVERCAST_MAX_SUBSCRIPTIONS || 0);
+  const maxEpisodesPerFeed = Number(
+    options.maxEpisodesPerFeed ?? env.OVERCAST_MAX_EPISODES_PER_FEED ?? DEFAULT_MAX_EPISODES_PER_FEED
+  );
   const opml = options.opml || readOvercastOpml(env);
-  const feeds = opmlToPodcastFeeds(opml, { topic, maxSubscriptions });
+  const feeds = opmlToPodcastFeeds(opml, { topic, maxSubscriptions, maxEpisodesPerFeed });
   const { activeFeeds, skippedFeeds } =
     options.skipUnavailable === false || env.OVERCAST_SKIP_UNAVAILABLE === "false"
       ? { activeFeeds: feeds, skippedFeeds: [] }
@@ -40,6 +44,7 @@ export async function syncOvercastSubscriptions(options = {}) {
 export function opmlToPodcastFeeds(opml, options = {}) {
   const topic = options.topic || "Podcasts";
   const maxSubscriptions = Number(options.maxSubscriptions || 0);
+  const maxEpisodesPerFeed = Number(options.maxEpisodesPerFeed ?? DEFAULT_MAX_EPISODES_PER_FEED);
   const $ = cheerio.load(opml, { xmlMode: true });
   const seen = new Set();
   const feeds = [];
@@ -59,6 +64,7 @@ export function opmlToPodcastFeeds(opml, options = {}) {
       cleanAttribute(outline.attr("name")) ||
       hostnameTitle(feedUrl);
     const siteUrl = cleanAttribute(outline.attr("htmlUrl") || outline.attr("htmlurl")) || siteUrlFromFeedUrl(feedUrl);
+    const overcastEpisodes = overcastEpisodesFromOutline($, outline, { maxEpisodesPerFeed });
 
     feeds.push(
       removeEmptyValues({
@@ -66,7 +72,8 @@ export function opmlToPodcastFeeds(opml, options = {}) {
         feedUrl,
         siteUrl,
         topic,
-        source: "podcast"
+        source: "podcast",
+        overcastEpisodes: overcastEpisodes.length ? overcastEpisodes : null
       })
     );
 
@@ -77,19 +84,19 @@ export function opmlToPodcastFeeds(opml, options = {}) {
 }
 
 export function readOvercastOpml(env = process.env) {
+  if (env.OVERCAST_OPML_PATH) {
+    if (!existsSync(env.OVERCAST_OPML_PATH)) {
+      throw new Error(`OVERCAST_OPML_PATH does not exist: ${env.OVERCAST_OPML_PATH}`);
+    }
+    return readFileSync(env.OVERCAST_OPML_PATH, "utf8");
+  }
+
   if (env.OVERCAST_OPML_BASE64) {
     return Buffer.from(env.OVERCAST_OPML_BASE64, "base64").toString("utf8");
   }
 
   if (env.OVERCAST_OPML) {
     return env.OVERCAST_OPML;
-  }
-
-  if (env.OVERCAST_OPML_PATH) {
-    if (!existsSync(env.OVERCAST_OPML_PATH)) {
-      throw new Error(`OVERCAST_OPML_PATH does not exist: ${env.OVERCAST_OPML_PATH}`);
-    }
-    return readFileSync(env.OVERCAST_OPML_PATH, "utf8");
   }
 
   throw new Error("Set OVERCAST_OPML_BASE64, OVERCAST_OPML, or OVERCAST_OPML_PATH before running Overcast sync.");
@@ -139,6 +146,65 @@ async function unavailablePodcastFeed(feed, options = {}) {
 
 function cleanAttribute(value) {
   return String(value || "").trim();
+}
+
+function overcastEpisodesFromOutline($, feedOutline, options = {}) {
+  const maxEpisodesPerFeed = Number(options.maxEpisodesPerFeed ?? DEFAULT_MAX_EPISODES_PER_FEED);
+  if (maxEpisodesPerFeed === 0) return [];
+
+  const episodes = [];
+  const seen = new Set();
+
+  feedOutline.find("outline").each((_, element) => {
+    if (maxEpisodesPerFeed > 0 && episodes.length >= maxEpisodesPerFeed) return false;
+
+    const outline = $(element);
+    const overcastUrl = overcastEpisodeUrl(outline);
+    if (!overcastUrl) return;
+
+    const title =
+      cleanAttribute(outline.attr("title")) ||
+      cleanAttribute(outline.attr("text")) ||
+      cleanAttribute(outline.attr("name"));
+    const url = cleanAttribute(outline.attr("url") || outline.attr("htmlUrl") || outline.attr("htmlurl"));
+    const guid = cleanAttribute(outline.attr("guid") || outline.attr("episodeGuid") || outline.attr("episodeguid"));
+    const enclosureUrl = cleanAttribute(outline.attr("enclosureUrl") || outline.attr("enclosureurl"));
+    const publishedAt = cleanAttribute(
+      outline.attr("pubDate") || outline.attr("pubdate") || outline.attr("published") || outline.attr("date")
+    );
+
+    if (seen.has(overcastUrl)) return;
+    seen.add(overcastUrl);
+
+    episodes.push(
+      removeEmptyValues({
+        title,
+        url,
+        guid,
+        enclosureUrl,
+        publishedAt,
+        overcastUrl
+      })
+    );
+  });
+
+  return episodes;
+}
+
+function overcastEpisodeUrl(outline) {
+  const value = cleanAttribute(outline.attr("overcastUrl") || outline.attr("overcasturl"));
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    if ((url.protocol === "http:" || url.protocol === "https:") && url.hostname === "overcast.fm") {
+      return url.toString();
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function normalizeComparableUrl(rawUrl) {

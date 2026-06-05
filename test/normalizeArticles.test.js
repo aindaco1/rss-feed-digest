@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isLikelySponsoredPost, normalizeFeedItems, stripFeedBoilerplate } from "../src/feeds/normalizeArticles.js";
+import { hydrateMissingImages } from "../src/feeds/fetchFeeds.js";
 
 const feed = {
   title: "Example Feed",
@@ -106,6 +107,95 @@ test("uses Atom id as the article URL when link and guid are absent", () => {
 
   assert.equal(articles.length, 1);
   assert.equal(articles[0].url, "https://example.com/atom-only-article");
+});
+
+test("uses Atom link objects as article URLs before image hydration", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url) => {
+    assert.equal(String(url), "https://jacobin.com/2026/06/rights-corporate-personhood-ai-environment");
+    return new Response('<meta property="og:image" content="https://media.jacobin.com/images/2026/6/167126433179.jpg">', {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" }
+    });
+  };
+
+  const articles = normalizeFeedItems(
+    {
+      ...feed,
+      title: "Jacobin",
+      feedUrl: "https://jacobinmag.com/feed/",
+      siteUrl: "https://jacobin.com",
+      topic: "Politics"
+    },
+    {
+      items: [
+        {
+          title: "Giving Rights to Robots Is a Bad Idea",
+          link: [{ href: "https://jacobin.com/2026/06/rights-corporate-personhood-ai-environment" }],
+          id: "tag:jacobin.com,2026:post-1",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content: "Article body"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles[0].url, "https://jacobin.com/2026/06/rights-corporate-personhood-ai-environment");
+  await hydrateMissingImages(articles);
+  assert.equal(articles[0].imageUrl, "https://media.jacobin.com/images/2026/6/167126433179.jpg");
+});
+
+test("matches Overcast episode URLs onto podcast items", () => {
+  const articles = normalizeFeedItems(
+    {
+      ...feed,
+      title: "Podcast Show",
+      feedUrl: "https://feeds.example.com/show.xml",
+      source: "podcast",
+      topic: "Podcasts",
+      overcastEpisodes: [
+        {
+          title: "Episode One",
+          url: "https://example.com/show/episode-one",
+          enclosureUrl: "https://audio.example.com/one.mp3",
+          overcastUrl: "https://overcast.fm/+ABC123"
+        },
+        {
+          title: "Episode Two",
+          overcastUrl: "https://overcast.fm/+DEF456"
+        }
+      ]
+    },
+    {
+      items: [
+        {
+          title: "Episode One",
+          link: "https://example.com/show/episode-one?utm_source=rss",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          enclosure: {
+            url: "https://audio.example.com/one.mp3",
+            type: "audio/mpeg"
+          },
+          content: "Episode summary"
+        },
+        {
+          title: "Episode Two",
+          guid: "episode-two-guid",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          content: "Episode summary"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles[0].overcastUrl, "https://overcast.fm/+ABC123");
+  assert.equal(articles[1].overcastUrl, "https://overcast.fm/+DEF456");
 });
 
 test("uses media group descriptions and thumbnails for video feeds", () => {

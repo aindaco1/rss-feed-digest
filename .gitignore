@@ -6,3 +6,6 @@ out/
 !.env.example
 config/youtube-subscriptions.json
 config/podcast-subscriptions.json
+config/*.opml
+config/*.opml.b64
+!config/*.opml.gpg

@@ -2,16 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { appLinkForArticle } from "../src/util/appLinks.js";
 
-test("builds Overcast app links from podcast feed URLs", () => {
+test("builds Overcast app links from episode URLs", () => {
   assert.deepEqual(
+    appLinkForArticle({
+      sourceType: "podcast",
+      feedUrl: "https://feeds.example.com/show.xml",
+      overcastUrl: "https://overcast.fm/+ABC123"
+    }),
+    {
+      label: "Open in Overcast",
+      url: "https://overcast.fm/+ABC123"
+    }
+  );
+});
+
+test("omits Overcast app links without episode URLs", () => {
+  assert.equal(
     appLinkForArticle({
       sourceType: "podcast",
       feedUrl: "https://feeds.example.com/show.xml"
     }),
-    {
-      label: "Subscribe in Overcast",
-      url: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml"
-    }
+    null
   );
 });
 

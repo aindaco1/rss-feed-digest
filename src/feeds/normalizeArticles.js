@@ -47,7 +47,7 @@ function shouldIncludeItem(feedConfig, item) {
 function normalizeItem(feedConfig, item, sourceImageUrl) {
   const rawTitle = textFromMaybeHtml(item.title || "");
   const title = normalizeDisplayTitle(feedConfig, rawTitle);
-  const url = item.link || item.guid || item.id;
+  const url = itemUrlFromItem(item);
   const publishedAt = parsePublishedAt(item);
 
   if (!rawTitle || !url || !publishedAt) return null;
@@ -62,6 +62,12 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
 
   const canonicalUrl = canonicalizeUrl(url);
   const imageUrl = pickImageFromItem(item, contentHtml, canonicalUrl);
+  const overcastUrl = pickOvercastEpisodeUrl(feedConfig, item, {
+    url,
+    canonicalUrl,
+    rawTitle,
+    title
+  });
 
   return {
     id: hash(`${feedConfig.feedUrl}:${canonicalUrl}:${rawTitle}`),
@@ -78,7 +84,8 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
     summary,
     text: text.slice(0, 6000),
     imageUrl,
-    sourceImageUrl
+    sourceImageUrl,
+    overcastUrl
   };
 }
 
@@ -102,6 +109,171 @@ function canonicalizeUrl(rawUrl) {
   } catch {
     return rawUrl;
   }
+}
+
+function itemUrlFromItem(item) {
+  const candidates = [
+    ...linkCandidates(item.link),
+    ...linkCandidates(item.links),
+    item.guid,
+    item.id
+  ];
+
+  const stringCandidates = candidates.map((candidate) => cleanWhitespace(String(candidate || ""))).filter(Boolean);
+  return stringCandidates.find(isWebUrl) || stringCandidates[0] || "";
+}
+
+function linkCandidates(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => linkCandidates(item));
+  }
+
+  if (typeof value === "string") return [value];
+
+  if (typeof value === "object") {
+    return [
+      value.href,
+      value.url,
+      value.link,
+      value._,
+      value.$?.href,
+      value.$?.url
+    ].filter(Boolean);
+  }
+
+  return [];
+}
+
+function isWebUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function pickOvercastEpisodeUrl(feedConfig, item, article) {
+  const episodes = Array.isArray(feedConfig.overcastEpisodes) ? feedConfig.overcastEpisodes : [];
+  if (!episodes.length) return null;
+
+  const articleTokens = comparableEpisodeTokens([
+    article.url,
+    article.canonicalUrl,
+    item.link,
+    item.links,
+    item.guid,
+    item.id,
+    ...enclosureUrlCandidates(item.enclosure),
+    ...enclosureUrlCandidates(item.enclosures)
+  ]);
+
+  for (const episode of episodes) {
+    const overcastUrl = webOvercastUrl(episode.overcastUrl);
+    if (!overcastUrl) continue;
+
+    const episodeTokens = comparableEpisodeTokens([
+      episode.url,
+      episode.guid,
+      episode.enclosureUrl,
+      episode.enclosureURL,
+      episode.link
+    ]);
+    if ([...episodeTokens].some((token) => articleTokens.has(token))) return overcastUrl;
+  }
+
+  const articleTitle = normalizeForMatch(article.rawTitle || article.title);
+  if (!articleTitle) return null;
+
+  for (const episode of episodes) {
+    const overcastUrl = webOvercastUrl(episode.overcastUrl);
+    if (!overcastUrl) continue;
+
+    const episodeTitle = normalizeForMatch(episode.title || episode.text || episode.name);
+    if (episodeTitle && episodeTitle === articleTitle) return overcastUrl;
+  }
+
+  return null;
+}
+
+function webOvercastUrl(value) {
+  if (!isWebUrl(value)) return null;
+
+  try {
+    const url = new URL(value);
+    return url.hostname === "overcast.fm" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function comparableEpisodeTokens(values) {
+  const tokens = new Set();
+
+  for (const value of values.flatMap((item) => linkCandidates(item))) {
+    const token = comparableEpisodeToken(value);
+    if (token) tokens.add(token);
+  }
+
+  return tokens;
+}
+
+function comparableEpisodeToken(value) {
+  const cleaned = cleanWhitespace(String(value || ""));
+  if (!cleaned) return null;
+
+  const comparableUrl = normalizeComparableUrl(cleaned);
+  if (comparableUrl) return `url:${comparableUrl}`;
+
+  const comparableGuid = normalizeGuid(cleaned);
+  return comparableGuid ? `guid:${comparableGuid}` : null;
+}
+
+function normalizeComparableUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    url.hash = "";
+    for (const param of [...url.searchParams.keys()]) {
+      if (TRACKING_PARAMS.has(param.toLowerCase()) || param.toLowerCase().startsWith("utm_")) {
+        url.searchParams.delete(param);
+      }
+    }
+    url.protocol = "https:";
+    url.hostname = url.hostname.toLowerCase();
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGuid(value) {
+  return cleanWhitespace(decodeHtmlEntities(value)).toLowerCase();
+}
+
+function enclosureUrlCandidates(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => enclosureUrlCandidates(item));
+  }
+
+  if (typeof value === "string") return [value];
+
+  if (typeof value === "object") {
+    return [
+      value.url,
+      value.href,
+      value.enclosureUrl,
+      value.enclosure_url,
+      value.$?.url,
+      value.$?.href
+    ].filter(Boolean);
+  }
+
+  return [];
 }
 
 function cleanArticleSummary(summary, feedConfig) {

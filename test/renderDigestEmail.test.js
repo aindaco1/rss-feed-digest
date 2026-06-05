@@ -82,15 +82,15 @@ test("renders app links for articles and sources", () => {
             headline: "Podcast episode",
             summary: "A new episode.",
             url: "https://example.com/episode",
-            appUrl: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml",
-            appLabel: "Subscribe in Overcast",
+            appUrl: "https://overcast.fm/+ABC123",
+            appLabel: "Open in Overcast",
             sources: [
               {
                 name: "Podcast Show",
                 title: "Podcast episode",
                 url: "https://example.com/episode",
-                appUrl: "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml",
-                appLabel: "Subscribe in Overcast"
+                appUrl: "https://overcast.fm/+ABC123",
+                appLabel: "Open in Overcast"
               }
             ]
           }
@@ -99,8 +99,8 @@ test("renders app links for articles and sources", () => {
     ]
   });
 
-  assert.match(html, /Subscribe in Overcast/);
-  assert.match(html, /overcast:\/\/x-callback-url\/add\?url=https%3A%2F%2Ffeeds\.example\.com%2Fshow\.xml/);
+  assert.match(html, /Open in Overcast/);
+  assert.match(html, /https:\/\/overcast\.fm\/\+ABC123/);
 });
 
 test("does not render non-web article or source URLs as links", () => {

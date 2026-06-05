@@ -1,8 +1,8 @@
 export function appLinkForArticle(article, env = process.env) {
-  if (article?.sourceType === "podcast" && article.feedUrl) {
+  if (article?.sourceType === "podcast" && isWebUrl(article.overcastUrl)) {
     return {
-      label: "Subscribe in Overcast",
-      url: `overcast://x-callback-url/add?url=${encodeURIComponent(article.feedUrl)}`
+      label: "Open in Overcast",
+      url: article.overcastUrl
     };
   }
 
@@ -17,6 +17,15 @@ export function appLinkForArticle(article, env = process.env) {
   }
 
   return null;
+}
+
+function isWebUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function applyUrlTemplate(template, url) {

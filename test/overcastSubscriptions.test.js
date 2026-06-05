@@ -16,6 +16,18 @@ const sampleOpml = `<?xml version="1.0" encoding="UTF-8"?>
   </body>
 </opml>`;
 
+const sampleAllDataOpml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+  <body>
+    <outline text="feeds">
+      <outline type="rss" text="Podcast Show" xmlUrl="https://feeds.example.com/show.xml" htmlUrl="https://example.com/show">
+        <outline text="Episode One" url="https://example.com/show/episode-one" guid="episode-one" enclosureUrl="https://audio.example.com/one.mp3" overcastUrl="https://overcast.fm/+ABC123" />
+        <outline text="Episode Two" url="https://example.com/show/episode-two" overcastUrl="https://overcast.fm/+DEF456" />
+      </outline>
+    </outline>
+  </body>
+</opml>`;
+
 test("converts Overcast OPML outlines to podcast feeds", () => {
   const feeds = opmlToPodcastFeeds(sampleOpml, { topic: "Audio" });
 
@@ -37,6 +49,32 @@ test("converts Overcast OPML outlines to podcast feeds", () => {
   ]);
 });
 
+test("keeps Overcast episode URLs from all-data OPML", () => {
+  const feeds = opmlToPodcastFeeds(sampleAllDataOpml, {
+    topic: "Audio",
+    maxEpisodesPerFeed: 1
+  });
+
+  assert.deepEqual(feeds, [
+    {
+      title: "Podcast Show",
+      feedUrl: "https://feeds.example.com/show.xml",
+      siteUrl: "https://example.com/show",
+      topic: "Audio",
+      source: "podcast",
+      overcastEpisodes: [
+        {
+          title: "Episode One",
+          url: "https://example.com/show/episode-one",
+          guid: "episode-one",
+          enclosureUrl: "https://audio.example.com/one.mp3",
+          overcastUrl: "https://overcast.fm/+ABC123"
+        }
+      ]
+    }
+  ]);
+});
+
 test("reads Overcast OPML from base64, raw text, or file path", () => {
   const dir = mkdtempSync(join(tmpdir(), "rss-digest-opml-"));
   const opmlPath = join(dir, "overcast.opml");
@@ -45,6 +83,21 @@ test("reads Overcast OPML from base64, raw text, or file path", () => {
   assert.equal(readOvercastOpml({ OVERCAST_OPML_BASE64: Buffer.from(sampleOpml).toString("base64") }), sampleOpml);
   assert.equal(readOvercastOpml({ OVERCAST_OPML: sampleOpml }), sampleOpml);
   assert.equal(readOvercastOpml({ OVERCAST_OPML_PATH: opmlPath }), sampleOpml);
+});
+
+test("prefers decrypted Overcast OPML path over inline secrets", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rss-digest-opml-"));
+  const opmlPath = join(dir, "overcast.opml");
+  writeFileSync(opmlPath, sampleAllDataOpml);
+
+  assert.equal(
+    readOvercastOpml({
+      OVERCAST_OPML_PATH: opmlPath,
+      OVERCAST_OPML_BASE64: Buffer.from(sampleOpml).toString("base64"),
+      OVERCAST_OPML: sampleOpml
+    }),
+    sampleAllDataOpml
+  );
 });
 
 test("syncs Overcast OPML to generated podcast feed config", async () => {

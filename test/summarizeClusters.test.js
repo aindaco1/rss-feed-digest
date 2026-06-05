@@ -59,6 +59,7 @@ test("adds Overcast app links for podcast digest articles", async () => {
             sourceName: "Podcast Show",
             sourceType: "podcast",
             feedUrl: "https://feeds.example.com/show.xml",
+            overcastUrl: "https://overcast.fm/+ABC123",
             topicHint: "Podcasts"
           })
         ]
@@ -71,10 +72,10 @@ test("adds Overcast app links for podcast digest articles", async () => {
   const digestArticle = digest.topics[0].articles[0];
   assert.equal(
     digestArticle.appUrl,
-    "overcast://x-callback-url/add?url=https%3A%2F%2Ffeeds.example.com%2Fshow.xml"
+    "https://overcast.fm/+ABC123"
   );
-  assert.equal(digestArticle.appLabel, "Subscribe in Overcast");
-  assert.equal(digestArticle.sources[0].appLabel, "Subscribe in Overcast");
+  assert.equal(digestArticle.appLabel, "Open in Overcast");
+  assert.equal(digestArticle.sources[0].appLabel, "Open in Overcast");
 });
 
 function article(overrides) {
@@ -86,6 +87,7 @@ function article(overrides) {
     sourceName: overrides.sourceName,
     sourceType: overrides.sourceType,
     feedUrl: overrides.feedUrl,
+    overcastUrl: overrides.overcastUrl,
     topicHint: overrides.topicHint || "Tech",
     publishedAt: "2026-06-01T12:00:00.000Z",
     url: `https://example.com/${overrides.id}`,
