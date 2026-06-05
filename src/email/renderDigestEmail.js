@@ -42,6 +42,15 @@ function escapeHtml(value = "") {
     .replaceAll("'", "&#39;");
 }
 
+function isWebUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function renderSources(sources = []) {
   if (!sources.length) return "";
   const isCombined = sources.length > 1;
@@ -52,7 +61,7 @@ function renderSources(sources = []) {
       const label = isCombined && source.title ? `${sourceName}: ${source.title}` : sourceName;
       const name = escapeHtml(label);
       const url = source.url || source.link;
-      const sourceLink = url
+      const sourceLink = isWebUrl(url)
         ? `<a href="${escapeHtml(url)}" style="${styles.link}">${name}</a>`
         : name;
       const appLink = source.appUrl
@@ -84,11 +93,12 @@ function renderSourceHeading(sources = []) {
 function renderArticle(article) {
   const sources = article.sources || [];
   const sourceNames = renderSourceHeading(sources);
+  const articleUrl = isWebUrl(article.url) ? article.url : null;
   const imageTag = article.imageUrl
     ? `<img class="digest-card-img" src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.imageAlt || article.headline || "")}" style="${styles.cardImage}">`
     : "";
-  const image = imageTag && article.url
-    ? `<a href="${escapeHtml(article.url)}" style="${styles.cardImageLink}">${imageTag}</a>`
+  const image = imageTag && articleUrl
+    ? `<a href="${escapeHtml(articleUrl)}" style="${styles.cardImageLink}">${imageTag}</a>`
     : imageTag;
   const summary = compactSummary(article.summary);
 
@@ -98,7 +108,7 @@ function renderArticle(article) {
       <div style="${styles.cardBody}">
         ${sourceNames ? `<p style="${styles.sourceLine}">${escapeHtml(sourceNames)}</p>` : ""}
         <h2 style="${styles.articleTitle}">
-          ${article.url ? `<a href="${escapeHtml(article.url)}" style="${styles.link}">${escapeHtml(article.headline)}</a>` : escapeHtml(article.headline)}
+          ${articleUrl ? `<a href="${escapeHtml(articleUrl)}" style="${styles.link}">${escapeHtml(article.headline)}</a>` : escapeHtml(article.headline)}
         </h2>
         ${article.appUrl ? `<p style="${styles.appLinkLine}"><a href="${escapeHtml(article.appUrl)}" style="${styles.link}">${escapeHtml(article.appLabel || "Open in app")}</a></p>` : ""}
         <p style="${styles.summary}">${escapeHtml(summary)}</p>

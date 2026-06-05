@@ -101,3 +101,28 @@ test("renders app links for articles and sources", () => {
   assert.match(html, /Open in Overcast/);
   assert.match(html, /overcast:\/\/x-callback-url\/add\?url=https%3A%2F%2Ffeeds\.example\.com%2Fshow\.xml/);
 });
+
+test("does not render non-web article or source URLs as links", () => {
+  const html = renderDigestEmail({
+    dateLabel: "06/01/2026",
+    topics: [
+      {
+        name: "Podcasts",
+        articles: [
+          {
+            headline: "Podcast episode",
+            summary: "A new episode.",
+            url: "episode-guid",
+            imageUrl: "https://images.example.com/podcast.jpg",
+            sources: [{ name: "Podcast Show", url: "source-guid" }]
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.match(html, /Podcast episode/);
+  assert.match(html, /Podcast Show/);
+  assert.doesNotMatch(html, /href="episode-guid"/);
+  assert.doesNotMatch(html, /href="source-guid"/);
+});
