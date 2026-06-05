@@ -16,6 +16,7 @@ const parser = new Parser({
       ["dc:creator", "creator"],
       ["media:content", "mediaContent", { keepArray: true }],
       ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+      ["media:group", "mediaGroup"],
       ["itunes:image", "itunesImage"]
     ]
   },

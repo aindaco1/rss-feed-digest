@@ -108,6 +108,38 @@ test("uses Atom id as the article URL when link and guid are absent", () => {
   assert.equal(articles[0].url, "https://example.com/atom-only-article");
 });
 
+test("uses media group descriptions and thumbnails for video feeds", () => {
+  const articles = normalizeFeedItems(
+    { ...feed, title: "YouTube Test", feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123" },
+    {
+      items: [
+        {
+          title: "A city gardening short",
+          link: "https://www.youtube.com/shorts/video-id",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          author: "YouTube Channel",
+          mediaGroup: {
+            "media:description": ["Turn small spaces into urban gardens."],
+            "media:thumbnail": [
+              {
+                $: {
+                  url: "https://i.ytimg.com/vi/video-id/hqdefault.jpg",
+                  width: "480",
+                  height: "360"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles[0].summary, "Turn small spaces into urban gardens.");
+  assert.equal(articles[0].imageUrl, "https://i.ytimg.com/vi/video-id/hqdefault.jpg");
+});
+
 test("filters feed items by required title text", () => {
   const articles = normalizeFeedItems(
     { ...feed, titleIncludes: "1080p" },

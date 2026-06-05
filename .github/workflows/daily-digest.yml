@@ -48,6 +48,9 @@ jobs:
       FEEDBIN_SYNC_EXTRA_TITLES: ${{ vars.FEEDBIN_SYNC_EXTRA_TITLES || 'Joblo' }}
       FEEDBIN_PREFER_FOR_BACKFILLS: ${{ vars.FEEDBIN_PREFER_FOR_BACKFILLS || 'true' }}
       FEEDBIN_BACKFILL_AFTER_HOURS: ${{ vars.FEEDBIN_BACKFILL_AFTER_HOURS || '6' }}
+      YOUTUBE_SYNC_SUBSCRIPTIONS: ${{ vars.YOUTUBE_SYNC_SUBSCRIPTIONS || 'false' }}
+      YOUTUBE_TOPIC: ${{ vars.YOUTUBE_TOPIC || 'YouTube' }}
+      YOUTUBE_MAX_SUBSCRIPTIONS: ${{ vars.YOUTUBE_MAX_SUBSCRIPTIONS || '0' }}
       SUBSTACK_ARCHIVE_LIMIT: ${{ vars.SUBSTACK_ARCHIVE_LIMIT || '30' }}
       ALLOW_PARTIAL_DIGEST_SEND: ${{ vars.ALLOW_PARTIAL_DIGEST_SEND || 'false' }}
       USE_EMBEDDINGS: ${{ vars.USE_EMBEDDINGS || 'true' }}
@@ -114,6 +117,9 @@ jobs:
           DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
           FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
           FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: npm run check:env
 
       - name: Sync Feedbin subscriptions
@@ -122,6 +128,14 @@ jobs:
           FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
           FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
         run: npm run feedbin:sync
+
+      - name: Sync YouTube subscriptions
+        if: steps.mode.outputs.should_run == 'true' && env.YOUTUBE_SYNC_SUBSCRIPTIONS == 'true'
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: npm run youtube:sync
 
       - name: Build digest
         if: steps.mode.outputs.should_run == 'true'
@@ -132,6 +146,9 @@ jobs:
           DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
           FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
           FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         shell: bash
         run: |
           args=()

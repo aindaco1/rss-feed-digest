@@ -20,10 +20,17 @@ const OPTIONAL = [
   "SUBSTACK_ARCHIVE_LIMIT",
   "ALLOW_PARTIAL_DIGEST_SEND",
   "AI_MAX_CLUSTERS",
-  "AI_SUMMARIZE_SINGLE_ARTICLES"
+  "AI_SUMMARIZE_SINGLE_ARTICLES",
+  "YOUTUBE_SYNC_SUBSCRIPTIONS",
+  "YOUTUBE_TOPIC",
+  "YOUTUBE_MAX_SUBSCRIPTIONS",
+  "YOUTUBE_SUBSCRIPTIONS_PATH"
 ];
 
-const missing = REQUIRED_FOR_SEND.filter((name) => !process.env[name]);
+const REQUIRED_FOR_YOUTUBE_SYNC = ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"];
+const youtubeSyncEnabled = process.env.YOUTUBE_SYNC_SUBSCRIPTIONS === "true";
+const required = youtubeSyncEnabled ? [...REQUIRED_FOR_SEND, ...REQUIRED_FOR_YOUTUBE_SYNC] : REQUIRED_FOR_SEND;
+const missing = required.filter((name) => !process.env[name]);
 
 console.log("Required for scheduled send:");
 for (const name of REQUIRED_FOR_SEND) {
@@ -33,6 +40,13 @@ for (const name of REQUIRED_FOR_SEND) {
 console.log("\nOptional:");
 for (const name of OPTIONAL) {
   console.log(`- ${name}: ${process.env[name] ? "set" : "default"}`);
+}
+
+if (youtubeSyncEnabled) {
+  console.log("\nRequired for YouTube subscription sync:");
+  for (const name of REQUIRED_FOR_YOUTUBE_SYNC) {
+    console.log(`- ${name}: ${process.env[name] ? "set" : "missing"}`);
+  }
 }
 
 if (missing.length) {

@@ -353,6 +353,9 @@ function isCrossSourceMatch(evidence, settings) {
       evidence.sharedTitlePhraseSignals >= settings.minSharedPhrases &&
       evidence.sharedTitleSignals >= settings.minSharedSignals) ||
     (evidence.semanticScore >= settings.crossSourceSparseSemanticThreshold &&
+      evidence.sharedTitleSignals >= 1 &&
+      evidence.sharedSignals >= settings.minSharedSignals + 1) ||
+    (evidence.semanticScore >= settings.crossSourceSparseSemanticThreshold &&
       evidence.sharedSignals >= settings.minSharedSignals + 6 &&
       evidence.sharedPhraseSignals >= settings.minSharedStrongPhrases + 1) ||
     (evidence.semanticScore >= settings.crossSourcePhraseSemanticThreshold &&
@@ -420,6 +423,9 @@ function clustersCanMerge(left, right, settings) {
   }
 
   let hasAcceptedPair = false;
+  let hasIncompatiblePair = false;
+  const leftAcceptedPairs = new Array(left.profiles.length).fill(false);
+  const rightAcceptedPairs = new Array(right.profiles.length).fill(false);
 
   for (let leftIndex = 0; leftIndex < left.profiles.length; leftIndex += 1) {
     for (let rightIndex = 0; rightIndex < right.profiles.length; rightIndex += 1) {
@@ -427,13 +433,21 @@ function clustersCanMerge(left, right, settings) {
       const score = pairScore(left.profiles[leftIndex], right.profiles[rightIndex], sameSource, settings);
       if (score.accepted) {
         hasAcceptedPair = true;
+        leftAcceptedPairs[leftIndex] = true;
+        rightAcceptedPairs[rightIndex] = true;
         continue;
       }
-      if (!isClusterCompatible(score.evidence, settings)) return false;
+      if (!isClusterCompatible(score.evidence, settings)) hasIncompatiblePair = true;
     }
   }
 
-  return hasAcceptedPair;
+  if (!hasAcceptedPair) return false;
+  if (!hasIncompatiblePair) return true;
+
+  return (
+    clustersShareStrongAnchor(left, right) &&
+    (leftAcceptedPairs.every(Boolean) || rightAcceptedPairs.every(Boolean))
+  );
 }
 
 function combineClusters(left, right) {
@@ -661,6 +675,30 @@ function intersectionSize(a, b) {
 
 function union(a, b) {
   return new Set([...a, ...b]);
+}
+
+function clustersShareStrongAnchor(left, right) {
+  return intersectionSize(strongClusterAnchors(left), strongClusterAnchors(right)) > 0;
+}
+
+function strongClusterAnchors(cluster) {
+  const counts = new Map();
+  const minimumCount = cluster.profiles.length <= 2 ? 1 : Math.ceil(cluster.profiles.length * 0.6);
+
+  for (const profile of cluster.profiles) {
+    for (const feature of profile.signals) {
+      if (!feature.startsWith("t:")) continue;
+
+      const term = feature.slice(2);
+      if (isStrongAnchorTerm(term)) counts.set(term, (counts.get(term) || 0) + 1);
+    }
+  }
+
+  return new Set([...counts.entries()].filter(([, count]) => count >= minimumCount).map(([term]) => term));
+}
+
+function isStrongAnchorTerm(term) {
+  return isSignalToken(term) && term.length >= 5;
 }
 
 function cosine(a, b) {

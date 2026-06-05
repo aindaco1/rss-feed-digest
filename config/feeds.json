@@ -12,6 +12,7 @@
     "Politics",
     "Local",
     "Games",
+    "YouTube",
     "Music",
     "Comics",
     "Sports",
@@ -194,6 +195,14 @@
       "siteUrl": "https://www.damagemag.com/",
       "topic": "Politics",
       "source": "feedbin"
+    },
+    {
+      "title": "Compact",
+      "feedUrl": "https://www.compactmag.com/rss/",
+      "siteUrl": "https://www.compactmag.com/",
+      "topic": "Politics",
+      "source": "feedbin",
+      "feedbinSync": true
     },
     {
       "title": "The Daily Chela",

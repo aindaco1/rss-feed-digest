@@ -175,6 +175,101 @@ test("clusters event coverage when the bridging article arrives later", () => {
   assert.equal(clusters[0].articles.length, 3);
 });
 
+test("merges sparse same-event follow-ups into an anchored cluster", () => {
+  const clusters = clusterArticles([
+    article({
+      id: "a",
+      title: "All Marvel characters in Wolverine on PS5 (so far)",
+      summary: "Marvel's Wolverine debuted a new trailer at Sony's PlayStation State of Play.",
+      text: "The PS5 game showed Wolverine, Jean Grey, and several Marvel characters during Sony's stream.",
+      sourceName: "Polygon",
+      topicHint: "Games",
+      publishedAt: "2026-06-03T19:00:20.000Z"
+    }),
+    article({
+      id: "b",
+      title: "12 Things We Just Learned About Marvel’s Wolverine And Why The Other X-Men Aren’t In It",
+      summary: "The upcoming PS5 exclusive is Insomniac Games' bloodiest action-adventure yet.",
+      text: "Insomniac showed Marvel's Wolverine gameplay and details after Sony's presentation.",
+      sourceName: "Kotaku",
+      topicHint: "Games",
+      publishedAt: "2026-06-03T15:45:54.000Z"
+    }),
+    article({
+      id: "c",
+      title: "PlayStation is getting back to what it’s good at",
+      summary:
+        "PlayStation used its most recent State of Play showcase to focus on premium single-player games, beginning with Marvel's Wolverine from Insomniac.",
+      text: "The State of Play showcase opened with Marvel's Wolverine gameplay, Jean Grey, and other single-player PlayStation games.",
+      sourceName: "The Verge",
+      topicHint: "Tech",
+      publishedAt: "2026-06-03T15:30:15.000Z"
+    }),
+    article({
+      id: "d",
+      title: "Extended WOLVERINE trailer reveals Jean Grey and more",
+      summary: "Insomniac's Wolverine gameplay reveal shows Jean Grey and brutal action.",
+      text: "The extended Wolverine trailer reveals Jean Grey and more details from Insomniac's PS5 game.",
+      sourceName: "Comics Beat",
+      topicHint: "Comics",
+      publishedAt: "2026-06-03T13:00:42.000Z"
+    }),
+    article({
+      id: "e",
+      title: "We Need To Talk About The Violence In That Wolverine Reveal",
+      summary: "Worry not, this is no demand for sanitizing anything; it's an appeal to the craft",
+      text: "",
+      sourceName: "Kotaku",
+      topicHint: "Games",
+      publishedAt: "2026-06-03T15:08:50.000Z"
+    }),
+    article({
+      id: "f",
+      title: "Insomniac's Wolverine game looks every bit as bloody as it should",
+      summary:
+        "With how great Insomniac's Spider-Man game was and how okay its sequel was, it's no surprise that Marvel has apparently designated them the Marvel game studio.",
+      text: "",
+      sourceName: "Boing Boing",
+      topicHint: "Projects",
+      publishedAt: "2026-06-03T16:46:19.000Z"
+    })
+  ]);
+
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].articles.length, 6);
+});
+
+test("does not merge articles that only share a franchise term", () => {
+  const clusters = clusterArticles([
+    article({
+      id: "a",
+      title: "All Marvel characters in Wolverine on PS5 (so far)",
+      summary: "Marvel's Wolverine debuted a new trailer at Sony's PlayStation State of Play.",
+      text: "The PS5 game showed Wolverine, Jean Grey, and several Marvel characters during Sony's stream.",
+      sourceName: "Polygon",
+      topicHint: "Games"
+    }),
+    article({
+      id: "b",
+      title: "12 Things We Just Learned About Marvel’s Wolverine And Why The Other X-Men Aren’t In It",
+      summary: "The upcoming PS5 exclusive is Insomniac Games' bloodiest action-adventure yet.",
+      text: "Insomniac showed Marvel's Wolverine gameplay and details after Sony's presentation.",
+      sourceName: "Kotaku",
+      topicHint: "Games"
+    }),
+    article({
+      id: "c",
+      title: "Wolverine Omnibus arrives in stores",
+      summary: "A collected edition reprints a classic run from the 1990s.",
+      text: "The omnibus includes older comics issues and creator notes.",
+      sourceName: "Comics Beat",
+      topicHint: "Comics"
+    })
+  ]);
+
+  assert.equal(clusters.length, 2);
+});
+
 test("clusters same-source stories with a distinctive shared title phrase", () => {
   const clusters = clusterArticles([
     article({

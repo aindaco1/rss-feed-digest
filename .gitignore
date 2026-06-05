@@ -4,3 +4,4 @@ out/
 .env
 .env.*
 !.env.example
+config/youtube-subscriptions.json

@@ -71,6 +71,12 @@ Required repository secrets:
 - `FEEDBIN_EMAIL`
 - `FEEDBIN_PASSWORD`
 
+Optional YouTube subscription sync secrets:
+
+- `YOUTUBE_CLIENT_ID`
+- `YOUTUBE_CLIENT_SECRET`
+- `YOUTUBE_REFRESH_TOKEN`
+
 Optional repository variables:
 
 - `OPENAI_MODEL`
@@ -82,6 +88,9 @@ Optional repository variables:
 - `FEEDBIN_SYNC_EXTRA_TITLES`
 - `FEEDBIN_PREFER_FOR_BACKFILLS`
 - `FEEDBIN_BACKFILL_AFTER_HOURS`
+- `YOUTUBE_SYNC_SUBSCRIPTIONS`
+- `YOUTUBE_TOPIC`
+- `YOUTUBE_MAX_SUBSCRIPTIONS`
 - `SUBSTACK_ARCHIVE_LIMIT`
 - `ALLOW_PARTIAL_DIGEST_SEND`
 - `USE_EMBEDDINGS`
@@ -106,6 +115,7 @@ Optional repository variables:
 The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4` to reduce 403s from feeds that throttle GitHub-hosted runners.
 If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
 Before send runs, the workflow runs `npm run feedbin:sync` so Feedbin has subscriptions for Substack feeds and JoBlo. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable that. `FEEDBIN_SYNC_EXTRA_TITLES` defaults to `Joblo` and can be a comma-separated list.
+If `YOUTUBE_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run youtube:sync` before building the digest. This fetches the authenticated account's YouTube subscriptions, writes an ignored `config/youtube-subscriptions.json`, and the digest loads those generated channel feeds under the `YouTube` topic by default. Set `YOUTUBE_TOPIC` to route them to another topic, or `YOUTUBE_MAX_SUBSCRIPTIONS` to cap the number of synced channels.
 Manual backfills and older dry-runs prefer Feedbin cached entries for feeds with `source: "feedbin"` when Feedbin credentials are configured. This avoids losing items from short rolling public feeds such as GetComics. `FEEDBIN_BACKFILL_AFTER_HOURS` defaults to `6`; set `FEEDBIN_PREFER_FOR_BACKFILLS=false` to force direct RSS fetches for historical windows.
 Scheduled sends fail before Resend if any feeds fail. Set `ALLOW_PARTIAL_DIGEST_SEND=true` only if you want to send incomplete digests.
 
@@ -127,8 +137,35 @@ Feed entries in `config/feeds.json` support these optional maintenance fields:
 
 - `disabled`: keeps a feed documented while skipping digest generation, subscription sync, and feed audits.
 - `disabledReason`: records why a disabled feed is being skipped.
+- `feedbinSync`: opts a feed into the Feedbin subscription sync job.
 - `fallbackImageUrl`: supplies a default image when a feed item has none.
 - `titleIncludes`: keeps only items whose title contains the configured text.
 - YTS release titles are shortened for display by dropping source tags such as `[YTS.BZ]` and keeping useful release details.
 - `excludeSponsored`: drops explicit sponsored or affiliate posts, including page-level disclosures when sponsored checks are enabled.
 - `excludeSingleIssues`: drops GetComics-style single-issue posts with issue-number markers such as `#1`.
+
+## YouTube Subscriptions
+
+Do not use a YouTube username or password. YouTube subscriptions are synced through Google OAuth with the read-only `https://www.googleapis.com/auth/youtube.readonly` scope.
+
+One-time local setup:
+
+```bash
+export YOUTUBE_CLIENT_ID=...
+export YOUTUBE_CLIENT_SECRET=...
+npm run youtube:authorize
+```
+
+If the OAuth app is in Testing mode, add your Google account under Google Cloud Console → Google Auth Platform → Audience → Test users before opening the authorization URL.
+
+Open the printed URL, approve access, then add the printed value as the `YOUTUBE_REFRESH_TOKEN` repository secret. Add `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` as repository secrets too, then set the repository variable `YOUTUBE_SYNC_SUBSCRIPTIONS=true`.
+
+To test locally after authorization:
+
+```bash
+export YOUTUBE_REFRESH_TOKEN=...
+npm run youtube:sync
+npm run digest -- --dry-run --no-ai --no-embeddings
+```
+
+The generated file is `config/youtube-subscriptions.json`; it is ignored by git.

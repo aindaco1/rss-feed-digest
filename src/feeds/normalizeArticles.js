@@ -54,7 +54,7 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
 
   const contentHtml = item.contentEncoded || item["content:encoded"] || item.content || item.description || "";
   const text = stripFeedBoilerplate(htmlToText(contentHtml), { title: rawTitle });
-  const summarySource = item.contentSnippet || item.summary || item.description || text;
+  const summarySource = item.contentSnippet || item.summary || item.description || mediaDescriptionFromItem(item) || text;
   const summary = (stripFeedBoilerplate(textFromMaybeHtml(summarySource), { title: rawTitle }) || text).slice(0, 1200);
 
   if (feedConfig.excludeSponsored && isLikelySponsoredPost({ title: rawTitle, summary, text, contentHtml })) return null;
@@ -111,6 +111,7 @@ function pickImageFromItem(item, contentHtml, baseUrl) {
     item["media:content"],
     item.mediaThumbnail,
     item["media:thumbnail"],
+    mediaGroupImages(item.mediaGroup || item["media:group"]),
     item.itunesImage,
     item["itunes:image"],
     firstImageFromHtml(contentHtml)
@@ -155,6 +156,28 @@ function extractImageUrl(value, options = {}) {
   if ((String(type).startsWith("image/") || looksLikeImage(url)) && isAllowedImage(url, options)) return url;
 
   return null;
+}
+
+function mediaDescriptionFromItem(item) {
+  return firstMediaGroupValue(item.mediaGroup || item["media:group"], "media:description");
+}
+
+function mediaGroupImages(mediaGroup) {
+  if (!mediaGroup) return null;
+  return [
+    mediaGroup["media:thumbnail"],
+    mediaGroup.mediaThumbnail,
+    mediaGroup["media:content"],
+    mediaGroup.mediaContent
+  ].filter(Boolean);
+}
+
+function firstMediaGroupValue(mediaGroup, key) {
+  if (!mediaGroup) return "";
+
+  const value = mediaGroup[key] || mediaGroup.mediaDescription;
+  if (Array.isArray(value)) return cleanWhitespace(value.find((item) => typeof item === "string") || "");
+  return typeof value === "string" ? cleanWhitespace(value) : "";
 }
 
 function isAllowedImage(url, options) {
