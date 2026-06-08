@@ -1,11 +1,4 @@
 export function appLinkForArticle(article, env = process.env) {
-  if (article?.sourceType === "podcast" && isWebUrl(article.overcastUrl)) {
-    return {
-      label: "Open in Overcast",
-      url: article.overcastUrl
-    };
-  }
-
   if (article?.sourceType === "youtube" && article.url) {
     const template = env.VIDEO_LITE_URL_TEMPLATE || "";
     if (!template) return null;
@@ -17,15 +10,6 @@ export function appLinkForArticle(article, env = process.env) {
   }
 
   return null;
-}
-
-function isWebUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function applyUrlTemplate(template, url) {

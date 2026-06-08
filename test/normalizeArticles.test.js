@@ -109,6 +109,29 @@ test("uses Atom id as the article URL when link and guid are absent", () => {
   assert.equal(articles[0].url, "https://example.com/atom-only-article");
 });
 
+test("ignores malformed guid objects when article links are valid", () => {
+  const articles = normalizeFeedItems(
+    feed,
+    {
+      items: [
+        {
+          title: "Article with malformed guid",
+          link: "https://example.com/article-with-malformed-guid",
+          guid: {
+            $: { isPermaLink: "false" }
+          },
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content: "Article body"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.equal(articles.length, 1);
+  assert.equal(articles[0].url, "https://example.com/article-with-malformed-guid");
+});
+
 test("uses Atom link objects as article URLs before image hydration", async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {
@@ -205,7 +228,7 @@ test("uses media group descriptions and thumbnails for video feeds", () => {
       items: [
         {
           title: "A city gardening short",
-          link: "https://www.youtube.com/shorts/video-id",
+          link: "https://www.youtube.com/watch?v=video-id",
           isoDate: "2026-05-31T18:00:00.000Z",
           author: "YouTube Channel",
           mediaGroup: {
@@ -228,6 +251,45 @@ test("uses media group descriptions and thumbnails for video feeds", () => {
 
   assert.equal(articles[0].summary, "Turn small spaces into urban gardens.");
   assert.equal(articles[0].imageUrl, "https://i.ytimg.com/vi/video-id/hqdefault.jpg");
+});
+
+test("excludes YouTube Shorts", () => {
+  const articles = normalizeFeedItems(
+    {
+      ...feed,
+      title: "YouTube Test",
+      feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123",
+      source: "youtube"
+    },
+    {
+      items: [
+        {
+          title: "A short clip",
+          link: "https://www.youtube.com/shorts/short-id",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content: "Short body"
+        },
+        {
+          title: "Tagged short #shorts",
+          link: "https://www.youtube.com/watch?v=tagged-short-id",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          content: "Tagged short body"
+        },
+        {
+          title: "Regular video",
+          link: "https://www.youtube.com/watch?v=video-id",
+          isoDate: "2026-05-31T20:00:00.000Z",
+          content: "Regular video body"
+        }
+      ]
+    },
+    window
+  );
+
+  assert.deepEqual(
+    articles.map((article) => article.title),
+    ["Regular video"]
+  );
 });
 
 test("strips redundant YouTube URLs from YouTube summaries", () => {

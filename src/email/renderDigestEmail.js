@@ -14,6 +14,13 @@ const CARD_ESTIMATE = {
   summaryCharsPerLine: 34,
   sourceCharsPerLine: 42
 };
+const BOTTOM_TOPIC_ORDER = new Map([
+  ["youtube", 0],
+  ["podcast", 1],
+  ["podcasts", 1],
+  ["download", 2],
+  ["downloads", 2]
+]);
 
 const styles = {
   page: "margin:0;padding:0;background:#0f0f0f;color:#f6f1e8;font-family:Arial,Helvetica,sans-serif;",
@@ -227,6 +234,29 @@ function renderTopic(topic) {
     </section>`;
 }
 
+function orderTopicsForEmail(topics = []) {
+  const regularTopics = [];
+  const bottomTopics = [];
+
+  for (const topic of topics) {
+    const rank = bottomTopicRank(topic);
+    if (rank === null) regularTopics.push(topic);
+    else bottomTopics.push({ topic, rank });
+  }
+
+  return [
+    ...regularTopics,
+    ...bottomTopics
+      .sort((left, right) => left.rank - right.rank)
+      .map(({ topic }) => topic)
+  ];
+}
+
+function bottomTopicRank(topic) {
+  const name = String(topic?.name || "").trim().toLowerCase();
+  return BOTTOM_TOPIC_ORDER.has(name) ? BOTTOM_TOPIC_ORDER.get(name) : null;
+}
+
 export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, intro, headerImageUrl, topics }) {
   const headerImage = headerImageUrl
     ? `<img src="${escapeHtml(headerImageUrl)}" alt="" style="display:block;width:100%;height:auto;border:0;">`
@@ -260,7 +290,7 @@ export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, 
           <h1 style="${styles.h1}">${escapeHtml(title)}</h1>
           ${intro ? `<p style="${styles.deck}">${escapeHtml(intro)}</p>` : ""}
         </header>
-        ${topics.map(renderTopic).join("\n")}
+        ${orderTopicsForEmail(topics).map(renderTopic).join("\n")}
         <footer style="${styles.footer}">
           Sent by the RSS Feed Digest workflow. Articles are grouped from the last digest window and linked back to the original sources.
         </footer>

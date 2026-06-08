@@ -39,6 +39,7 @@ function shouldIncludeItem(feedConfig, item) {
   const title = textFromMaybeHtml(item.title || "");
 
   if (feedConfig.excludeSingleIssues && isLikelySingleIssueComicTitle(title)) return false;
+  if (isYouTubeFeed(feedConfig) && isYouTubeShortItem(item, title)) return false;
   if (!feedConfig.titleIncludes) return true;
 
   return title.toLowerCase().includes(String(feedConfig.titleIncludes).toLowerCase());
@@ -115,11 +116,11 @@ function itemUrlFromItem(item) {
   const candidates = [
     ...linkCandidates(item.link),
     ...linkCandidates(item.links),
-    item.guid,
-    item.id
+    ...linkCandidates(item.guid),
+    ...linkCandidates(item.id)
   ];
 
-  const stringCandidates = candidates.map((candidate) => cleanWhitespace(String(candidate || ""))).filter(Boolean);
+  const stringCandidates = candidates.map(cleanStringCandidate).filter(Boolean);
   return stringCandidates.find(isWebUrl) || stringCandidates[0] || "";
 }
 
@@ -144,6 +145,16 @@ function linkCandidates(value) {
   }
 
   return [];
+}
+
+function cleanStringCandidate(value) {
+  if (value === null || value === undefined) return "";
+
+  try {
+    return cleanWhitespace(String(value));
+  } catch {
+    return "";
+  }
 }
 
 function isWebUrl(value) {
@@ -283,6 +294,39 @@ function cleanArticleSummary(summary, feedConfig) {
 
 function isYouTubeFeed(feedConfig) {
   return feedConfig.source === "youtube" || /(?:^|\.)youtube\.com$/i.test(hostnameFromUrl(feedConfig.feedUrl));
+}
+
+function isYouTubeShortItem(item, title) {
+  const haystack = [
+    title,
+    item.contentSnippet,
+    item.summary,
+    item.description,
+    mediaDescriptionFromItem(item)
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (/(?:^|\s)#shorts?\b/i.test(haystack)) return true;
+
+  return [
+    itemUrlFromItem(item),
+    item.guid,
+    item.id,
+    ...linkCandidates(item.link),
+    ...linkCandidates(item.links)
+  ].some(isYouTubeShortUrl);
+}
+
+function isYouTubeShortUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./, "");
+    const [first] = url.pathname.split("/").filter(Boolean);
+    return host.endsWith("youtube.com") && first === "shorts";
+  } catch {
+    return false;
+  }
 }
 
 function stripYouTubeUrlsFromSummary(summary) {

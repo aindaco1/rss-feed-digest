@@ -45,7 +45,7 @@ test("uses medium text verbosity for gpt-4.1-mini AI summaries", async () => {
   assert.equal(digest.topics[0].articles[0].headline, "Merged headline");
 });
 
-test("adds Overcast app links for podcast digest articles", async () => {
+test("omits special app links for podcast digest articles", async () => {
   const digest = await summarizeClusters(
     [
       {
@@ -70,12 +70,11 @@ test("adds Overcast app links for podcast digest articles", async () => {
   );
 
   const digestArticle = digest.topics[0].articles[0];
-  assert.equal(
-    digestArticle.appUrl,
-    "https://overcast.fm/+ABC123"
-  );
-  assert.equal(digestArticle.appLabel, "Open in Overcast");
-  assert.equal(digestArticle.sources[0].appLabel, "Open in Overcast");
+  assert.equal(digestArticle.url, "https://example.com/podcast");
+  assert.equal(digestArticle.appUrl, null);
+  assert.equal(digestArticle.appLabel, null);
+  assert.equal(digestArticle.sources[0].appUrl, null);
+  assert.equal(digestArticle.sources[0].appLabel, null);
 });
 
 function article(overrides) {

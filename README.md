@@ -130,7 +130,8 @@ The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4`
 If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
 Before send runs, the workflow runs `npm run feedbin:sync` so Feedbin has subscriptions for Substack feeds and JoBlo. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable that. `FEEDBIN_SYNC_EXTRA_TITLES` defaults to `Joblo` and can be a comma-separated list.
 If `OVERCAST_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run overcast:sync` before building the digest. This reads an Overcast OPML export from `OVERCAST_OPML_BASE64`, `OVERCAST_OPML`, `OVERCAST_OPML_PATH`, or an encrypted OPML file, writes an ignored `config/podcast-subscriptions.json`, and the digest loads those generated podcast feeds under the `Podcasts` topic by default. Set `OVERCAST_TOPIC` to route them to another topic, `OVERCAST_MAX_SUBSCRIPTIONS` to cap the number of synced podcasts, or `OVERCAST_MAX_EPISODES_PER_FEED` to a positive number to cap stored episode links from an Overcast all-data export. `OVERCAST_MAX_EPISODES_PER_FEED` defaults to `0`, which keeps all episode links. `OVERCAST_SKIP_UNAVAILABLE` defaults to `true` and drops OPML entries whose feed URL returns 404 or 410.
-If `YOUTUBE_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run youtube:sync` before building the digest. This fetches the authenticated account's YouTube subscriptions, writes an ignored `config/youtube-subscriptions.json`, and the digest loads those generated channel feeds under the `YouTube` topic by default. Set `YOUTUBE_TOPIC` to route them to another topic, or `YOUTUBE_MAX_SUBSCRIPTIONS` to cap the number of synced channels.
+If `YOUTUBE_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run youtube:sync` before building the digest. This fetches the authenticated account's YouTube subscriptions, writes an ignored `config/youtube-subscriptions.json`, and the digest loads those generated channel feeds under the `YouTube` topic by default. Set `YOUTUBE_TOPIC` to route them to another topic, or `YOUTUBE_MAX_SUBSCRIPTIONS` to cap the number of synced channels. YouTube Shorts are filtered out of the digest.
+The email renderer always moves the `YouTube`, `Podcasts`, and `Downloads` sections to the bottom of the email.
 Manual backfills and older dry-runs prefer Feedbin cached entries for feeds with `source: "feedbin"` when Feedbin credentials are configured. This avoids losing items from short rolling public feeds such as GetComics. `FEEDBIN_BACKFILL_AFTER_HOURS` defaults to `6`; set `FEEDBIN_PREFER_FOR_BACKFILLS=false` to force direct RSS fetches for historical windows.
 Scheduled sends fail before Resend if any feeds fail. Set `ALLOW_PARTIAL_DIGEST_SEND=true` only if you want to send incomplete digests.
 
@@ -186,16 +187,16 @@ npm run digest -- --dry-run --no-ai --no-embeddings
 
 The generated file is `config/youtube-subscriptions.json`; it is ignored by git.
 
-Digest podcast cards include an `Open in Overcast` link only when the synced Overcast export contains an episode-level `overcastUrl`. The digest does not generate Overcast subscribe links as a fallback. YouTube cards keep their normal web links unless `VIDEO_LITE_URL_TEMPLATE` is set. The template supports `{url}`, `{encodedUrl}`, and `{videoId}` placeholders, for example `someapp://open?url={encodedUrl}`. Video Lite does not publish a URL scheme in its public docs, so do not set this until you have a confirmed working scheme.
+Podcast cards use the normal episode or article link from the feed. The digest does not render Overcast subscribe links or Overcast web links because Overcast only documents a subscribe-prompt URL scheme, not a reliable episode-open scheme. YouTube cards keep their normal web links unless `VIDEO_LITE_URL_TEMPLATE` is set. The template supports `{url}`, `{encodedUrl}`, and `{videoId}` placeholders, for example `someapp://open?url={encodedUrl}`. Video Lite does not publish a URL scheme in its public docs, so do not set this until you have a confirmed working scheme.
 
 ## Overcast Podcasts
 
-Overcast podcast subscriptions are synced from an OPML export. The workflow does not store an Overcast username or password. Use Overcast's all-data export when you want episode-level `Open in Overcast` links; a subscriptions-only OPML export can sync podcast feeds but does not contain episode URLs.
+Overcast podcast subscriptions are synced from an OPML export. The workflow does not store an Overcast username or password. A subscriptions-only OPML export is enough for feed syncing; all-data exports can still be used, but episode-level `overcastUrl` values are not rendered as special links unless a reliable episode-open app scheme becomes available.
 
 Export OPML from Overcast:
 
 1. Sign in at `https://overcast.fm/account`.
-2. Use the all-data export when episode links are needed, or the OPML subscriptions export for feed syncing only.
+2. Use the OPML subscriptions export for feed syncing, or the all-data export if you want to keep using the encrypted export workflow.
 3. Save the export as `overcast.opml`.
 
 Local test:

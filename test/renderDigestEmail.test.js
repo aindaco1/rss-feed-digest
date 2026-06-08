@@ -76,21 +76,21 @@ test("renders app links for articles and sources", () => {
     dateLabel: "06/01/2026",
     topics: [
       {
-        name: "Podcasts",
+        name: "YouTube",
         articles: [
           {
-            headline: "Podcast episode",
-            summary: "A new episode.",
-            url: "https://example.com/episode",
-            appUrl: "https://overcast.fm/+ABC123",
-            appLabel: "Open in Overcast",
+            headline: "Video episode",
+            summary: "A new video.",
+            url: "https://www.youtube.com/watch?v=video-id",
+            appUrl: "videolite://open?video=video-id",
+            appLabel: "Open in Video Lite",
             sources: [
               {
-                name: "Podcast Show",
-                title: "Podcast episode",
-                url: "https://example.com/episode",
-                appUrl: "https://overcast.fm/+ABC123",
-                appLabel: "Open in Overcast"
+                name: "YouTube Channel",
+                title: "Video episode",
+                url: "https://www.youtube.com/watch?v=video-id",
+                appUrl: "videolite://open?video=video-id",
+                appLabel: "Open in Video Lite"
               }
             ]
           }
@@ -99,8 +99,8 @@ test("renders app links for articles and sources", () => {
     ]
   });
 
-  assert.match(html, /Open in Overcast/);
-  assert.match(html, /https:\/\/overcast\.fm\/\+ABC123/);
+  assert.match(html, /Open in Video Lite/);
+  assert.match(html, /videolite:\/\/open\?video=video-id/);
 });
 
 test("does not render non-web article or source URLs as links", () => {
@@ -170,6 +170,47 @@ test("balances desktop columns by estimated article height", () => {
   assert.match(right, /Short second story/);
   assert.match(right, /Short third story/);
 });
+
+test("renders YouTube, Podcasts, and Downloads topics at the bottom", () => {
+  const html = renderDigestEmail({
+    dateLabel: "06/01/2026",
+    topics: [
+      topic("YouTube"),
+      topic("Tech"),
+      topic("Downloads"),
+      topic("Film"),
+      topic("Podcasts")
+    ]
+  });
+
+  const topicPositions = ["Tech", "Film", "YouTube", "Podcasts", "Downloads"].map((name) => ({
+    name,
+    index: html.indexOf(`<h2 style="margin:0;color:#fff;font-size:24px;line-height:1;font-weight:900;letter-spacing:0;">${name}</h2>`)
+  }));
+
+  for (const { name, index } of topicPositions) {
+    assert.notEqual(index, -1, `Expected topic ${name}`);
+  }
+
+  assert(topicPositions[0].index < topicPositions[1].index);
+  assert(topicPositions[1].index < topicPositions[2].index);
+  assert(topicPositions[2].index < topicPositions[3].index);
+  assert(topicPositions[3].index < topicPositions[4].index);
+});
+
+function topic(name) {
+  return {
+    name,
+    articles: [
+      {
+        headline: `${name} story`,
+        summary: "Summary.",
+        url: `https://example.com/${name.toLowerCase()}`,
+        sources: [{ name: `${name} Source`, url: `https://example.com/${name.toLowerCase()}/source` }]
+      }
+    ]
+  };
+}
 
 function desktopColumns(html) {
   const leftMarker =

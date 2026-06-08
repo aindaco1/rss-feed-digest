@@ -2,25 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { appLinkForArticle } from "../src/util/appLinks.js";
 
-test("builds Overcast app links from episode URLs", () => {
-  assert.deepEqual(
+test("omits podcast app links even when Overcast episode URLs are present", () => {
+  assert.equal(
     appLinkForArticle({
       sourceType: "podcast",
       feedUrl: "https://feeds.example.com/show.xml",
       overcastUrl: "https://overcast.fm/+ABC123"
-    }),
-    {
-      label: "Open in Overcast",
-      url: "https://overcast.fm/+ABC123"
-    }
-  );
-});
-
-test("omits Overcast app links without episode URLs", () => {
-  assert.equal(
-    appLinkForArticle({
-      sourceType: "podcast",
-      feedUrl: "https://feeds.example.com/show.xml"
     }),
     null
   );
@@ -31,7 +18,7 @@ test("builds configurable Video Lite links for YouTube videos", () => {
     appLinkForArticle(
       {
         sourceType: "youtube",
-        url: "https://www.youtube.com/shorts/video-id"
+        url: "https://www.youtube.com/watch?v=video-id"
       },
       {
         VIDEO_LITE_URL_TEMPLATE: "videolite://open?video={videoId}&url={encodedUrl}"
@@ -39,7 +26,7 @@ test("builds configurable Video Lite links for YouTube videos", () => {
     ),
     {
       label: "Open in Video Lite",
-      url: "videolite://open?video=video-id&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2Fvideo-id"
+      url: "videolite://open?video=video-id&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dvideo-id"
     }
   );
 });
