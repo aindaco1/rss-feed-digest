@@ -39,6 +39,7 @@ function shouldIncludeItem(feedConfig, item) {
   const title = textFromMaybeHtml(item.title || "");
 
   if (feedConfig.excludeSingleIssues && isLikelySingleIssueComicTitle(title)) return false;
+  if (feedConfig.excludeCouponPosts && isLikelyCouponPost(item, title)) return false;
   if (isYouTubeFeed(feedConfig) && isYouTubeShortItem(item, title)) return false;
   if (!feedConfig.titleIncludes) return true;
 
@@ -484,6 +485,56 @@ function isYtsBaselineReleaseTag(tag) {
 
 function isLikelySingleIssueComicTitle(title) {
   return /(?:^|[\s([{:;,-])#\d+[a-z]?(?=$|[\s)\],.:;–—-])/i.test(title);
+}
+
+const COUPON_CODE_PATTERN = /\b(?:coupon|promo|discount)\s+codes?\b/i;
+const COUPON_TITLE_PATTERN = /\bcoupons?\b/i;
+const MONTH_YEAR_PATTERN =
+  /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b/i;
+const SHOPPING_CONTEXT_PATTERN = /\b(?:deals?|discounts?|savings?|save|free trial|half off|best deal)\b/i;
+const DISCOUNT_TITLE_PATTERN = /\b(?:free trial|half off|nearly half off|\d+%\s*off|\$\d+(?:\.\d{2})?\s*off)\b/i;
+
+function isLikelyCouponPost(item, title) {
+  const url = itemUrlFromItem(item);
+  const titleText = cleanWhitespace(title);
+  const bodyText = cleanWhitespace(
+    [
+      item.contentSnippet,
+      item.summary,
+      item.description,
+      item.content,
+      item.contentEncoded,
+      item["content:encoded"]
+    ]
+      .map((value) => textFromMaybeHtml(value || ""))
+      .filter(Boolean)
+      .join(" ")
+  );
+  const combinedText = `${titleText} ${bodyText}`;
+  const commerceContext = `${combinedText} ${url}`;
+
+  if (isCouponUrl(url) && /\b(?:coupon|promo|discount|deal)s?\b/i.test(combinedText)) return true;
+  if (COUPON_CODE_PATTERN.test(combinedText) && hasShoppingContext(commerceContext)) return true;
+  if (COUPON_TITLE_PATTERN.test(titleText) && hasShoppingContext(commerceContext)) return true;
+  return DISCOUNT_TITLE_PATTERN.test(titleText) && /\b(?:coupon|promo|discount|deal)s?\b/i.test(commerceContext);
+}
+
+function hasShoppingContext(value) {
+  return MONTH_YEAR_PATTERN.test(value) || SHOPPING_CONTEXT_PATTERN.test(value);
+}
+
+function isCouponUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.pathname
+      .split("/")
+      .filter(Boolean)
+      .some((segment) =>
+        /^(?:coupon|coupons|coupon-code|coupon-codes|promo-code|promo-codes|discount-code|discount-codes)$/i.test(segment)
+      );
+  } catch {
+    return false;
+  }
 }
 
 export function isLikelySponsoredPost({

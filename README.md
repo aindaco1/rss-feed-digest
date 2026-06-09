@@ -158,6 +158,7 @@ Feed entries in `config/feeds.json` support these optional maintenance fields:
 - `preferFeedbinBackfill`: set to `false` to keep a `source: "feedbin"` feed on direct RSS fetches for manual backfills.
 - `titleIncludes`: keeps only items whose title contains the configured text.
 - YTS release titles are shortened for display by dropping source tags such as `[YTS.BZ]` and keeping useful release details.
+- `excludeCouponPosts`: drops recurring coupon-code and promo-code commerce posts while leaving normal reported stories alone.
 - `excludeSponsored`: drops explicit sponsored or affiliate posts, including page-level disclosures when sponsored checks are enabled.
 - `excludeSingleIssues`: drops GetComics-style single-issue posts with issue-number markers such as `#1`.
 

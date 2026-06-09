@@ -54,6 +54,10 @@ for (const [index, feed] of config.feeds.entries()) {
     errors.push(`${label}: excludeSponsored must be a boolean`);
   }
 
+  if (feed.excludeCouponPosts !== undefined && typeof feed.excludeCouponPosts !== "boolean") {
+    errors.push(`${label}: excludeCouponPosts must be a boolean`);
+  }
+
   if (feed.preferFeedbinBackfill !== undefined && typeof feed.preferFeedbinBackfill !== "boolean") {
     errors.push(`${label}: preferFeedbinBackfill must be a boolean`);
   }

@@ -27,7 +27,8 @@
       "feedUrl": "https://www.wired.com/feed",
       "siteUrl": "https://www.wired.com",
       "topic": "Tech",
-      "source": "feedbin"
+      "source": "feedbin",
+      "excludeCouponPosts": true
     },
     {
       "title": "Mac Rumors",

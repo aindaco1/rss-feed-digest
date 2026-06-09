@@ -441,6 +441,58 @@ test("filters GetComics-style single issue titles when configured", () => {
   );
 });
 
+test("filters recurring coupon code posts when configured", () => {
+  const articles = normalizeFeedItems(
+    { ...feed, title: "Wired Top Stories", excludeCouponPosts: true },
+    {
+      items: [
+        {
+          title: "Shark Promo Codes for June 2026",
+          link: "https://www.wired.com/coupons/shark/",
+          isoDate: "2026-05-31T18:00:00.000Z",
+          content: "Save with the latest promo codes."
+        },
+        {
+          title: "Paramount+ Coupon Codes and Deals for June 2026",
+          link: "https://www.wired.com/story/paramount-plus-coupon-codes/",
+          isoDate: "2026-05-31T19:00:00.000Z",
+          content: "Tested coupons and deals."
+        },
+        {
+          title: "1Password Coupon: Score a Free Trial in June 2026",
+          link: "https://www.wired.com/story/1password-coupon/",
+          isoDate: "2026-05-31T19:30:00.000Z",
+          content: "Save up to 28% on business and personal memberships with 1Password promo codes and deals."
+        },
+        {
+          title: "Exclusive: Get Bruvi’s Pod Coffee Maker for Nearly Half Off",
+          link: "https://www.wired.com/story/bruvi-bv-01-deal-june-2026/",
+          isoDate: "2026-05-31T19:45:00.000Z",
+          content: "Use this WIRED-exclusive coupon code to get the best deal on this machine."
+        },
+        {
+          title: "How Promo Codes Became a Privacy Problem",
+          link: "https://www.wired.com/story/promo-codes-privacy/",
+          isoDate: "2026-05-31T20:00:00.000Z",
+          content: "A reported story about shopping data and privacy."
+        },
+        {
+          title: "The New Battery Race Is Heating Up",
+          link: "https://www.wired.com/story/new-battery-race/",
+          isoDate: "2026-05-31T21:00:00.000Z",
+          content: "Battery researchers are testing a new chemistry."
+        }
+      ]
+    },
+    window
+  );
+
+  assert.deepEqual(
+    articles.map((article) => article.title),
+    ["How Promo Codes Became a Privacy Problem", "The New Battery Race Is Heating Up"]
+  );
+});
+
 test("filters sponsored posts by disclosure text when configured", () => {
   const articles = normalizeFeedItems(
     { ...feed, title: "Boing Boing", excludeSponsored: true },
