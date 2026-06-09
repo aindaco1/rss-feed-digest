@@ -322,6 +322,84 @@ test("clusters same-source roundup and full story when a title phrase appears in
   assert.equal(clusters[0].articles.length, 2);
 });
 
+test("does not let same-source roundups bridge unrelated stories", () => {
+  const clusters = clusterArticles([
+    article({
+      id: "a",
+      title: "Inside Chicago’s Obama Center",
+      summary:
+        "Italian art workers announce a nationwide strike, New York’s Penn Station to feature Trump’s name, and have you heard about the Obamalisk?",
+      text: "Italian art workers announce a nationwide strike. Chicago’s Obama Presidential Center opens in Jackson Park.",
+      topicHint: "Film",
+      sourceName: "Hyperallergic",
+      publishedAt: "2026-06-09T10:00:49.000Z"
+    }),
+    article({
+      id: "b",
+      title: "A First Look at the Art in the New Obama Presidential Center",
+      summary:
+        "The Obama Presidential Center in Chicago’s Jackson Park features public art, educational spaces, and community amenities.",
+      text: "The Obama Center includes commissions from Maya Lin and Idris Khan and will open in Chicago later this month.",
+      topicHint: "Film",
+      sourceName: "Hyperallergic",
+      publishedAt: "2026-06-08T21:57:21.000Z"
+    }),
+    article({
+      id: "c",
+      title: "Italian Arts Workers Announce Nationwide Strike",
+      summary:
+        "Arts and culture workers across Italy are launching a nationwide strike over labor conditions and public funding.",
+      text: "The strike involves museum workers, cultural workers, and unions across Italy.",
+      topicHint: "Film",
+      sourceName: "Hyperallergic",
+      publishedAt: "2026-06-08T20:20:46.000Z"
+    }),
+    article({
+      id: "d",
+      title: "Discover MA Arts and Cultural Enterprise at Central Saint Martins",
+      summary: "Develop business skills for cultural management and production on this flexible online Masters.",
+      text: "The course prepares cultural producers and arts professionals for leadership in the cultural sector.",
+      topicHint: "Film",
+      sourceName: "Hyperallergic",
+      publishedAt: "2026-06-08T15:00:37.000Z"
+    })
+  ]);
+
+  assert.equal(clusters.length, 3);
+  assert.deepEqual(
+    clusters.map((cluster) => cluster.articles.map((item) => item.id).sort()),
+    [["a", "b"], ["c"], ["d"]]
+  );
+});
+
+test("clusters same-source raw milk and RFK dairy stories", () => {
+  const clusters = clusterArticles([
+    article({
+      id: "a",
+      title: 'RFK, Jr. says "depriving" children of whole milk constitutes "a form of child abuse"',
+      summary:
+        "HHS Secretary Robert F. Kennedy, Jr. toured a Wisconsin dairy farm and touted the Whole Milk for Healthy Kids Act.",
+      text: "Kennedy promoted full-fat dairy products in school meal programs during June Dairy Month.",
+      topicHint: "Projects",
+      sourceName: "Boing Boing",
+      publishedAt: "2026-06-08T18:33:29.000Z"
+    }),
+    article({
+      id: "b",
+      title: "Nearly 60 Idahoans get a quick lesson in the joys of pasteurization",
+      summary:
+        "Raw milk is having another one of those weeks where it reminds everyone why Louis Pasteur got a Wikipedia page, and RFK Jr wears a tinfoil hat.",
+      text: "Idaho health officials are investigating how nearly 60 people got sick after drinking raw milk.",
+      topicHint: "Projects",
+      sourceName: "Boing Boing",
+      publishedAt: "2026-06-08T18:28:28.000Z"
+    })
+  ]);
+
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].articles.length, 2);
+});
+
 test("does not cluster same-source stories that only share a generic template phrase", () => {
   const clusters = clusterArticles([
     article({

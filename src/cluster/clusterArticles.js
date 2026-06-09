@@ -67,6 +67,7 @@ const LOW_SIGNAL_TERMS = new Set([
   "1hr",
   "allegedly",
   "announce",
+  "announc",
   "announced",
   "announcement",
   "announces",
@@ -257,6 +258,11 @@ function clusterSettings(options) {
       "CLUSTER_SAME_SOURCE_LEAD_PHRASE_SEMANTIC_THRESHOLD",
       0.02
     ),
+    sameSourceSparseTermWindowMinutes: numberSetting(
+      options.sameSourceSparseTermWindowMinutes,
+      "CLUSTER_SAME_SOURCE_SPARSE_TERM_WINDOW_MINUTES",
+      30
+    ),
     minSharedSignals: numberSetting(options.minSharedSignals, "CLUSTER_MIN_SHARED_SIGNALS", 2),
     minSharedPhrases: numberSetting(options.minSharedPhrases, "CLUSTER_MIN_SHARED_PHRASES", 1),
     minSharedStrongPhrases: numberSetting(options.minSharedStrongPhrases, "CLUSTER_MIN_SHARED_STRONG_PHRASES", 2),
@@ -309,8 +315,11 @@ function similarity(article, articleProfile, cluster, vectorsById, settings) {
   const acceptedScores = pairScores.filter((score) => score.accepted);
   if (!acceptedScores.length) return 0;
 
-  const clusterIsCoherent = pairScores.every((score) => score.accepted || isClusterCompatible(score.evidence, settings));
-  if (!clusterIsCoherent) return 0;
+  const rejectedScores = pairScores.filter((score) => !score.accepted);
+  if (rejectedScores.length) {
+    if (!rejectedScores.every((score) => isClusterCompatible(score.evidence, settings))) return 0;
+    if (!clustersShareStrongAnchor(cluster, singleArticleCluster(article, articleProfile))) return 0;
+  }
 
   const bestPairScore = Math.max(...acceptedScores.map((score) => score.score));
   return Math.max(settings.threshold, bestPairScore);
@@ -330,12 +339,17 @@ function pairScore(articleProfile, candidateProfile, sameSource, settings) {
 
 function pairEvidence(a, b) {
   return {
+    hasCommerceArticle: a.isCommerce || b.isCommerce,
+    minutesApart: minutesApart(a.publishedAt, b.publishedAt),
     semanticScore: weightedCosine(a.vector, b.vector),
     sharedSignals: intersectionSize(a.signals, b.signals),
     sharedPhraseSignals: intersectionSize(a.phraseSignals, b.phraseSignals),
     sharedTitleSignals: intersectionSize(a.titleSignals, b.titleSignals),
     sharedLeadSignals: intersectionSize(a.leadSignals, b.leadSignals),
     sharedTitlePhraseSignals: intersectionSize(a.titlePhraseSignals, b.titlePhraseSignals),
+    sharedTitleLeadSignals:
+      intersectionSize(termSignals(a.titleSignals), termSignals(b.leadSignals)) +
+      intersectionSize(termSignals(a.leadSignals), termSignals(b.titleSignals)),
     sharedTitleLeadPhraseSignals:
       intersectionSize(a.titlePhraseSignals, b.leadPhraseSignals) +
       intersectionSize(a.leadPhraseSignals, b.titlePhraseSignals)
@@ -378,6 +392,11 @@ function isSameSourceMatch(evidence, settings) {
     (evidence.semanticScore >= settings.sameSourceLeadPhraseSemanticThreshold &&
       evidence.sharedSignals >= settings.minSharedSignals + 1 &&
       evidence.sharedTitleLeadPhraseSignals >= settings.minSharedPhrases) ||
+    (!evidence.hasCommerceArticle &&
+      evidence.minutesApart <= settings.sameSourceSparseTermWindowMinutes &&
+      evidence.semanticScore >= settings.sameSourceLeadPhraseSemanticThreshold / 4 &&
+      evidence.sharedSignals >= settings.minSharedSignals &&
+      evidence.sharedTitleLeadSignals >= settings.minSharedSignals) ||
     (evidence.semanticScore >= settings.sameSourcePhraseSemanticThreshold &&
       sharedTitleInvolvedPhrases >= settings.minSharedStrongPhrases)
   );
@@ -425,7 +444,7 @@ function clustersCanMerge(left, right, settings) {
   }
 
   let hasAcceptedPair = false;
-  let hasIncompatiblePair = false;
+  let hasRejectedPair = false;
   const leftAcceptedPairs = new Array(left.profiles.length).fill(false);
   const rightAcceptedPairs = new Array(right.profiles.length).fill(false);
 
@@ -439,12 +458,12 @@ function clustersCanMerge(left, right, settings) {
         rightAcceptedPairs[rightIndex] = true;
         continue;
       }
-      if (!isClusterCompatible(score.evidence, settings)) hasIncompatiblePair = true;
+      hasRejectedPair = true;
     }
   }
 
   if (!hasAcceptedPair) return false;
-  if (!hasIncompatiblePair) return true;
+  if (!hasRejectedPair) return true;
 
   return (
     clustersShareStrongAnchor(left, right) &&
@@ -459,6 +478,13 @@ function combineClusters(left, right) {
     latestPublishedAt: maxDate(left.latestPublishedAt, right.latestPublishedAt),
     profiles: [...left.profiles, ...right.profiles],
     articles: [...left.articles, ...right.articles]
+  };
+}
+
+function singleArticleCluster(article, profile) {
+  return {
+    articles: [article],
+    profiles: [profile]
   };
 }
 
@@ -526,6 +552,7 @@ function finalizeProfile(rawProfile, documentFrequency, articleCount) {
     titlePhraseSignals,
     leadPhraseSignals,
     isCommerce: rawProfile.isCommerce,
+    publishedAt: rawProfile.article.publishedAt,
     magnitude: magnitude(vector)
   };
 }
@@ -685,7 +712,7 @@ function clustersShareStrongAnchor(left, right) {
 
 function strongClusterAnchors(cluster) {
   const counts = new Map();
-  const minimumCount = cluster.profiles.length <= 2 ? 1 : Math.ceil(cluster.profiles.length * 0.6);
+  const minimumCount = cluster.profiles.length <= 1 ? 1 : Math.ceil(cluster.profiles.length * 0.6);
 
   for (const profile of cluster.profiles) {
     for (const feature of profile.signals) {
@@ -701,6 +728,10 @@ function strongClusterAnchors(cluster) {
 
 function isStrongAnchorTerm(term) {
   return isSignalToken(term) && term.length >= 5;
+}
+
+function termSignals(signals) {
+  return new Set([...signals].filter((feature) => feature.startsWith("t:")));
 }
 
 function cosine(a, b) {
@@ -728,6 +759,13 @@ function dominantTopic(articles) {
 
 function maxDate(a, b) {
   return new Date(a) > new Date(b) ? a : b;
+}
+
+function minutesApart(a, b) {
+  const left = new Date(a).getTime();
+  const right = new Date(b).getTime();
+  if (Number.isNaN(left) || Number.isNaN(right)) return Number.POSITIVE_INFINITY;
+  return Math.abs(left - right) / 60000;
 }
 
 function topicSet(value) {
