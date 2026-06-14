@@ -56,6 +56,7 @@ jobs:
       OVERCAST_SKIP_UNAVAILABLE: ${{ vars.OVERCAST_SKIP_UNAVAILABLE || 'true' }}
       OVERCAST_CHECK_CONCURRENCY: ${{ vars.OVERCAST_CHECK_CONCURRENCY || '5' }}
       YOUTUBE_SYNC_SUBSCRIPTIONS: ${{ vars.YOUTUBE_SYNC_SUBSCRIPTIONS || 'false' }}
+      YOUTUBE_SYNC_REQUIRED: ${{ vars.YOUTUBE_SYNC_REQUIRED || 'false' }}
       YOUTUBE_TOPIC: ${{ vars.YOUTUBE_TOPIC || 'YouTube' }}
       YOUTUBE_MAX_SUBSCRIPTIONS: ${{ vars.YOUTUBE_MAX_SUBSCRIPTIONS || '0' }}
       VIDEO_LITE_URL_TEMPLATE: ${{ vars.VIDEO_LITE_URL_TEMPLATE || '' }}
@@ -176,7 +177,19 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-        run: npm run youtube:sync
+        shell: bash
+        run: |
+          if npm run youtube:sync; then
+            exit 0
+          fi
+
+          status=$?
+          if [[ "${YOUTUBE_SYNC_REQUIRED}" == "true" ]]; then
+            echo "::error::YouTube subscription sync failed and YOUTUBE_SYNC_REQUIRED=true."
+            exit "${status}"
+          fi
+
+          echo "::warning::YouTube subscription sync failed; continuing without refreshed YouTube subscription feeds. Re-authorize YOUTUBE_REFRESH_TOKEN or set YOUTUBE_SYNC_REQUIRED=true if this should block the digest."
 
       - name: Build digest
         if: steps.mode.outputs.should_run == 'true'
