@@ -60,6 +60,7 @@ test("syncs YouTube subscriptions through token refresh and paginated API calls"
   const result = await syncYouTubeSubscriptions({
     outputPath,
     topic: "YouTube",
+    skipUnavailable: false,
     env: {
       YOUTUBE_CLIENT_ID: "client-id",
       YOUTUBE_CLIENT_SECRET: "client-secret",
@@ -116,4 +117,71 @@ test("syncs YouTube subscriptions through token refresh and paginated API calls"
     generated.feeds.map((feed) => feed.title),
     ["First Channel", "Second Channel"]
   );
+});
+
+test("skips unavailable YouTube subscription feeds by default", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rss-digest-youtube-"));
+  const outputPath = join(dir, "youtube-subscriptions.json");
+  const checkedFeeds = [];
+
+  const result = await syncYouTubeSubscriptions({
+    outputPath,
+    topic: "YouTube",
+    env: {
+      YOUTUBE_CLIENT_ID: "client-id",
+      YOUTUBE_CLIENT_SECRET: "client-secret",
+      YOUTUBE_REFRESH_TOKEN: "refresh-token"
+    },
+    fetchImpl: async (url) => {
+      const urlString = String(url);
+
+      if (urlString === "https://oauth2.googleapis.com/token") {
+        return Response.json({ access_token: "access-token" });
+      }
+
+      if (urlString.startsWith("https://www.googleapis.com/youtube/v3/subscriptions")) {
+        return Response.json({
+          items: [
+            {
+              snippet: {
+                title: "Live Channel",
+                resourceId: { channelId: "UClive" }
+              }
+            },
+            {
+              snippet: {
+                title: "Deleted Topic",
+                resourceId: { channelId: "UCdeleted" }
+              }
+            }
+          ]
+        });
+      }
+
+      checkedFeeds.push(urlString);
+      if (urlString.includes("UCdeleted")) return new Response("", { status: 404 });
+      return new Response("<feed></feed>", { status: 200 });
+    }
+  });
+
+  const generated = JSON.parse(readFileSync(outputPath, "utf8"));
+
+  assert.equal(result.subscriptionCount, 2);
+  assert.equal(result.feedCount, 1);
+  assert.equal(result.skippedCount, 1);
+  assert.deepEqual(
+    generated.feeds.map((feed) => feed.title),
+    ["Live Channel"]
+  );
+  assert.deepEqual(generated.skippedFeeds, [
+    {
+      title: "Deleted Topic",
+      feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UCdeleted",
+      reason: "Status code 404"
+    }
+  ]);
+  assert.deepEqual(checkedFeeds.sort(), [
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCdeleted",
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UClive"
+  ]);
 });

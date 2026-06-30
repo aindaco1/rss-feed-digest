@@ -1,10 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { mapLimit } from "../util/concurrency.js";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SUBSCRIPTIONS_URL = "https://www.googleapis.com/youtube/v3/subscriptions";
 const DEFAULT_OUTPUT_URL = new URL("../../config/youtube-subscriptions.json", import.meta.url);
+const UNAVAILABLE_STATUSES = new Set([404, 410]);
 
 export async function syncYouTubeSubscriptions(options = {}) {
   const env = options.env || process.env;
@@ -20,17 +22,27 @@ export async function syncYouTubeSubscriptions(options = {}) {
     maxSubscriptions
   });
   const feeds = youtubeSubscriptionItemsToFeeds(subscriptions, { topic });
+  const { activeFeeds, skippedFeeds } =
+    options.skipUnavailable === false || env.YOUTUBE_SKIP_UNAVAILABLE === "false"
+      ? { activeFeeds: feeds, skippedFeeds: [] }
+      : await filterUnavailableYouTubeFeeds(feeds, {
+          fetchImpl,
+          concurrency: Number(options.checkConcurrency || env.YOUTUBE_CHECK_CONCURRENCY || 5),
+          timeoutMs: Number(options.timeoutMs || env.YOUTUBE_CHECK_TIMEOUT_MS || 8000)
+        });
 
   writeJson(outputPath, {
     generatedAt: new Date().toISOString(),
     source: "youtube-subscriptions",
-    feeds
+    feeds: activeFeeds,
+    skippedFeeds
   });
 
   return {
     outputPath,
     subscriptionCount: subscriptions.length,
-    feedCount: feeds.length
+    feedCount: activeFeeds.length,
+    skippedCount: skippedFeeds.length
   };
 }
 
@@ -126,6 +138,48 @@ async function fetchAllSubscriptions(accessToken, options = {}) {
   return subscriptions;
 }
 
+async function filterUnavailableYouTubeFeeds(feeds, options = {}) {
+  const checks = await mapLimit(feeds, options.concurrency || 5, async (feed) => {
+    const unavailable = await unavailableYouTubeFeed(feed, options);
+    return { feed, unavailable };
+  });
+
+  return {
+    activeFeeds: checks.filter((check) => !check.unavailable).map((check) => check.feed),
+    skippedFeeds: checks
+      .filter((check) => check.unavailable)
+      .map((check) => ({
+        title: check.feed.title,
+        feedUrl: check.feed.feedUrl,
+        reason: check.unavailable
+      }))
+  };
+}
+
+async function unavailableYouTubeFeed(feed, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 8000);
+  const fetchImpl = options.fetchImpl || fetch;
+
+  try {
+    const response = await fetchImpl(feed.feedUrl, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+        "user-agent": process.env.FEED_USER_AGENT || "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)"
+      }
+    });
+
+    await response.body?.cancel?.();
+    return UNAVAILABLE_STATUSES.has(response.status) ? `Status code ${response.status}` : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function youtubeCredentials(env) {
   const credentials = {
     YOUTUBE_CLIENT_ID: env.YOUTUBE_CLIENT_ID,
@@ -164,6 +218,9 @@ function writeJson(outputPath, payload) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = await syncYouTubeSubscriptions();
+    if (result.skippedCount) {
+      console.log(`Skipped ${result.skippedCount} unavailable YouTube subscription feed(s).`);
+    }
     console.log(`Wrote ${result.feedCount} YouTube subscription feed(s) to ${pathString(result.outputPath)}.`);
   } catch (error) {
     console.error(error.message);
