@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { mapLimit } from "../util/concurrency.js";
+import { cancelResponseBody } from "../util/fetch.js";
 import { firstImageFromHtml, metaImageFromHtml } from "../util/html.js";
 import { isLikelySponsoredPost, normalizeFeedItems } from "./normalizeArticles.js";
 
@@ -127,6 +128,7 @@ async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
     });
 
     if (!response.ok) {
+      await cancelResponseBody(response);
       throw statusError(response.status);
     }
 
@@ -148,7 +150,7 @@ export async function hydrateMissingImages(articles, options = {}) {
   const missing = articles.filter((article) => !article.imageUrl || shouldHydrateFromPage(article.imageUrl));
 
   await mapLimit(missing, concurrency, async (article) => {
-    const hydratedImageUrl = await fetchMetaImage(article.url);
+    const hydratedImageUrl = await fetchMetaImage(article.url, options);
 
     if (hydratedImageUrl) {
       article.imageUrl = hydratedImageUrl;
@@ -196,9 +198,16 @@ async function fetchArticleHtml(url, options = {}) {
       headers: requestHeaders({ accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" })
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      await cancelResponseBody(response);
+      return null;
+    }
+
     const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("text/html")) return null;
+    if (!contentType.includes("text/html")) {
+      await cancelResponseBody(response);
+      return null;
+    }
 
     return (await response.text()).slice(0, 500000);
   } catch {
@@ -230,20 +239,28 @@ function dedupeArticles(articles) {
   return deduped;
 }
 
-async function fetchMetaImage(url) {
+async function fetchMetaImage(url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), Number(options.metaImageTimeoutMs || 8000));
+  const fetchImpl = options.fetchImpl || fetch;
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchImpl(url, {
       signal: controller.signal,
       redirect: "follow",
       headers: requestHeaders({ accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" })
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      await cancelResponseBody(response);
+      return null;
+    }
+
     const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("text/html")) return null;
+    if (!contentType.includes("text/html")) {
+      await cancelResponseBody(response);
+      return null;
+    }
 
     const html = (await response.text()).slice(0, 500000);
     const pageUrl = response.url || url;
@@ -275,6 +292,7 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
     });
 
     if (!response.ok) {
+      await cancelResponseBody(response);
       throw statusError(response.status);
     }
 
@@ -339,6 +357,7 @@ async function fetchFeedbinJson(url, options = {}) {
     });
 
     if (!response.ok) {
+      await cancelResponseBody(response);
       throw statusError(response.status);
     }
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchArticles, fetchFeedXml } from "../src/feeds/fetchFeeds.js";
+import { fetchArticles, fetchFeedXml, hydrateMissingImages } from "../src/feeds/fetchFeeds.js";
 
 test("retries retryable feed failures", async () => {
   let calls = 0;
@@ -22,6 +22,62 @@ test("retries retryable feed failures", async () => {
 
   assert.equal(calls, 2);
   assert.match(xml, /<rss>/);
+});
+
+test("cancels unused feed response body before throwing status errors", async () => {
+  let cancelled = false;
+
+  await assert.rejects(
+    fetchFeedXml("https://example.com/feed", {
+      attempts: 1,
+      retryBaseDelayMs: 0,
+      retryJitterMs: 0,
+      env: {},
+      fetchImpl: async () => ({
+        ok: false,
+        status: 403,
+        bodyUsed: false,
+        body: {
+          cancel: async () => {
+            cancelled = true;
+          }
+        }
+      })
+    }),
+    /Status code 403/
+  );
+
+  assert.equal(cancelled, true);
+});
+
+test("cancels unused image hydration responses when they are not HTML", async () => {
+  let cancelled = false;
+  const articles = [
+    {
+      title: "Article without image",
+      url: "https://example.com/article",
+      imageUrl: null,
+      sourceImageUrl: null
+    }
+  ];
+
+  await hydrateMissingImages(articles, {
+    concurrency: 1,
+    fetchImpl: async () => ({
+      ok: true,
+      url: "https://example.com/article",
+      headers: new Headers({ "content-type": "application/json" }),
+      bodyUsed: false,
+      body: {
+        cancel: async () => {
+          cancelled = true;
+        }
+      }
+    })
+  });
+
+  assert.equal(cancelled, true);
+  assert.equal(articles[0].imageUrl, null);
 });
 
 test("sends CDN-friendly feed request headers", async () => {
