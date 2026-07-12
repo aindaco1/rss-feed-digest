@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mapLimit } from "../util/concurrency.js";
-import { cancelResponseBody } from "../util/fetch.js";
+import { discardResponseBody } from "../util/fetch.js";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SUBSCRIPTIONS_URL = "https://www.googleapis.com/youtube/v3/subscriptions";
@@ -172,7 +172,7 @@ async function unavailableYouTubeFeed(feed, options = {}) {
       }
     });
 
-    await cancelResponseBody(response);
+    await discardResponseBody(response);
     return UNAVAILABLE_STATUSES.has(response.status) ? `Status code ${response.status}` : null;
   } catch {
     return null;

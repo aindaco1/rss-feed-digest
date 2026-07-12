@@ -24,7 +24,7 @@ test("retries retryable feed failures", async () => {
   assert.match(xml, /<rss>/);
 });
 
-test("cancels unused feed response body before throwing status errors", async () => {
+test("discards unused feed response body before throwing status errors", async () => {
   let cancelled = false;
 
   await assert.rejects(
@@ -50,7 +50,7 @@ test("cancels unused feed response body before throwing status errors", async ()
   assert.equal(cancelled, true);
 });
 
-test("cancels unused image hydration responses when they are not HTML", async () => {
+test("discards unused image hydration responses when they are not HTML", async () => {
   let cancelled = false;
   const articles = [
     {
@@ -78,6 +78,68 @@ test("cancels unused image hydration responses when they are not HTML", async ()
 
   assert.equal(cancelled, true);
   assert.equal(articles[0].imageUrl, null);
+});
+
+test("drains unused response bodies instead of cancelling active readers", async () => {
+  const chunks = [new Uint8Array([1]), new Uint8Array([2])];
+  let reads = 0;
+  let cancelled = false;
+
+  await assert.rejects(
+    fetchFeedXml("https://example.com/feed", {
+      attempts: 1,
+      env: {},
+      fetchImpl: async () => ({
+        ok: false,
+        status: 503,
+        bodyUsed: false,
+        body: {
+          getReader: () => ({
+            read: async () => {
+              reads += 1;
+              return chunks.length ? { done: false, value: chunks.shift() } : { done: true };
+            },
+            releaseLock: () => {},
+            cancel: async () => {
+              cancelled = true;
+            }
+          }),
+          cancel: async () => {
+            cancelled = true;
+          }
+        }
+      })
+    }),
+    /Status code 503/
+  );
+
+  assert.equal(reads, 3);
+  assert.equal(cancelled, false);
+});
+
+test("wraps read-only AbortError messages when fallbacks fail", async () => {
+  const abortError = new DOMException("Feed request timed out", "AbortError");
+
+  await assert.rejects(
+    fetchFeedXml("https://example.com/feed", {
+      attempts: 1,
+      env: {
+        FEEDBIN_EMAIL: "reader@example.com",
+        FEEDBIN_PASSWORD: "password",
+        FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+      },
+      fetchImpl: async (url) => {
+        if (String(url) === "https://example.com/feed") throw abortError;
+        throw new Error("Feedbin unavailable");
+      }
+    }),
+    (error) => {
+      assert.equal(error.name, "AbortError");
+      assert.equal(error.cause, abortError);
+      assert.equal(error.message, "Feed request timed out; Feedbin fallback failed: Feedbin unavailable");
+      return true;
+    }
+  );
 });
 
 test("sends CDN-friendly feed request headers", async () => {

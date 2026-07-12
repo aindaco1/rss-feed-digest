@@ -1,6 +1,6 @@
 import Parser from "rss-parser";
 import { mapLimit } from "../util/concurrency.js";
-import { cancelResponseBody } from "../util/fetch.js";
+import { discardResponseBody } from "../util/fetch.js";
 import { firstImageFromHtml, metaImageFromHtml } from "../util/html.js";
 import { isLikelySponsoredPost, normalizeFeedItems } from "./normalizeArticles.js";
 
@@ -87,11 +87,16 @@ export async function fetchFeedXml(feedUrl, options = {}) {
       lastError = error;
 
       if (attempt >= attempts || !isRetryableFetchError(error)) {
+        let terminalError = error;
+
         if (isSubstackFeedUrl(feedUrl) && isRetryableFetchError(error)) {
           try {
             return await fetchSubstackArchiveAsRss(feedUrl, options);
           } catch (fallbackError) {
-            error.message = `${error.message}; Substack archive fallback failed: ${fallbackError.message}`;
+            terminalError = appendErrorMessage(
+              terminalError,
+              `Substack archive fallback failed: ${errorMessage(fallbackError)}`
+            );
           }
         }
 
@@ -99,13 +104,16 @@ export async function fetchFeedXml(feedUrl, options = {}) {
           try {
             return await fetchFeedbinFeedAsRss(feedUrl, options);
           } catch (fallbackError) {
-            error.message = `${error.message}; Feedbin fallback failed: ${fallbackError.message}`;
+            terminalError = appendErrorMessage(
+              terminalError,
+              `Feedbin fallback failed: ${errorMessage(fallbackError)}`
+            );
           }
         } else if (isSubstackFeedUrl(feedUrl)) {
-          error.message = `${error.message}; Feedbin fallback not configured`;
+          terminalError = appendErrorMessage(terminalError, "Feedbin fallback not configured");
         }
 
-        throw error;
+        throw terminalError;
       }
 
       await sleep(retryDelayMs(attempt, options));
@@ -117,7 +125,7 @@ export async function fetchFeedXml(feedUrl, options = {}) {
 
 async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
+  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -128,7 +136,7 @@ async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
     });
 
     if (!response.ok) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       throw statusError(response.status);
     }
 
@@ -199,13 +207,13 @@ async function fetchArticleHtml(url, options = {}) {
     });
 
     if (!response.ok) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       return null;
     }
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("text/html")) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       return null;
     }
 
@@ -252,13 +260,13 @@ async function fetchMetaImage(url, options = {}) {
     });
 
     if (!response.ok) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       return null;
     }
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("text/html")) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       return null;
     }
 
@@ -281,7 +289,7 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
   archiveUrl.searchParams.set("limit", String(options.substackArchiveLimit || process.env.SUBSTACK_ARCHIVE_LIMIT || 30));
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
+  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -292,7 +300,7 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
     });
 
     if (!response.ok) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       throw statusError(response.status);
     }
 
@@ -343,7 +351,7 @@ async function fetchFeedbinSubscriptions(options = {}) {
 
 async function fetchFeedbinJson(url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
+  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -357,7 +365,7 @@ async function fetchFeedbinJson(url, options = {}) {
     });
 
     if (!response.ok) {
-      await cancelResponseBody(response);
+      await discardResponseBody(response);
       throw statusError(response.status);
     }
 
@@ -384,9 +392,27 @@ function statusError(status) {
   return error;
 }
 
+function appendErrorMessage(error, detail) {
+  const wrapped = new Error(`${errorMessage(error)}; ${detail}`, { cause: error });
+
+  if (error?.name && error.name !== "Error") wrapped.name = error.name;
+  if (error?.status !== undefined) wrapped.status = error.status;
+
+  return wrapped;
+}
+
+function errorMessage(error) {
+  return error?.message || String(error);
+}
+
+function fetchTimeoutMs(options = {}) {
+  const env = options.env || process.env;
+  return Number(options.timeoutMs ?? env.FEED_FETCH_TIMEOUT_MS ?? 15000);
+}
+
 function isRetryableFetchError(error) {
-  if (RETRYABLE_STATUSES.has(error.status)) return true;
-  return error.name === "AbortError" || /fetch failed|network|timeout/i.test(error.message);
+  if (RETRYABLE_STATUSES.has(error?.status)) return true;
+  return error?.name === "AbortError" || /fetch failed|network|timeout/i.test(errorMessage(error));
 }
 
 function retryDelayMs(attempt, options) {

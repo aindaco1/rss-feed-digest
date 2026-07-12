@@ -89,6 +89,7 @@ Optional repository variables:
 - `OPENAI_EMBEDDING_MODEL`
 - `FEED_CONCURRENCY`
 - `FEED_FETCH_ATTEMPTS`
+- `FEED_FETCH_TIMEOUT_MS`
 - `FEEDBIN_PER_PAGE`
 - `FEEDBIN_SYNC_SUBSCRIPTIONS`
 - `FEEDBIN_SYNC_EXTRA_TITLES`
@@ -130,7 +131,7 @@ Optional repository variables:
 - `CLUSTER_MIN_SHARED_STRONG_PHRASES`
 - `NO_BROAD_CLUSTER_TOPICS`
 
-The workflow defaults `FEED_CONCURRENCY` to `2` and `FEED_FETCH_ATTEMPTS` to `4` to reduce 403s from feeds that throttle GitHub-hosted runners.
+The workflow defaults `FEED_CONCURRENCY` to `2`, `FEED_FETCH_ATTEMPTS` to `4`, and `FEED_FETCH_TIMEOUT_MS` to `30000` to accommodate large feeds and reduce transient failures from feeds that throttle GitHub-hosted runners.
 If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
 Before send runs, the workflow runs `npm run feedbin:sync` so Feedbin has subscriptions for Substack feeds and JoBlo. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable that. `FEEDBIN_SYNC_EXTRA_TITLES` defaults to `Joblo` and can be a comma-separated list.
 If `OVERCAST_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run overcast:sync` before building the digest. This reads an Overcast OPML export from `OVERCAST_OPML_BASE64`, `OVERCAST_OPML`, `OVERCAST_OPML_PATH`, or an encrypted OPML file, writes an ignored `config/podcast-subscriptions.json`, and the digest loads those generated podcast feeds under the `Podcasts` topic by default. Set `OVERCAST_TOPIC` to route them to another topic, `OVERCAST_MAX_SUBSCRIPTIONS` to cap the number of synced podcasts, or `OVERCAST_MAX_EPISODES_PER_FEED` to a positive number to cap stored episode links from an Overcast all-data export. `OVERCAST_MAX_EPISODES_PER_FEED` defaults to `0`, which keeps all episode links. `OVERCAST_SKIP_UNAVAILABLE` defaults to `true` and drops OPML entries whose feed URL returns 404 or 410.

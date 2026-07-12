@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as cheerio from "cheerio";
 import { mapLimit } from "../util/concurrency.js";
-import { cancelResponseBody } from "../util/fetch.js";
+import { discardResponseBody } from "../util/fetch.js";
 
 const DEFAULT_OUTPUT_URL = new URL("../../config/podcast-subscriptions.json", import.meta.url);
 const DEFAULT_MAX_EPISODES_PER_FEED = 0;
@@ -136,7 +136,7 @@ async function unavailablePodcastFeed(feed, options = {}) {
       }
     });
 
-    await cancelResponseBody(response);
+    await discardResponseBody(response);
     return UNAVAILABLE_STATUSES.has(response.status) ? `Status code ${response.status}` : null;
   } catch {
     return null;
