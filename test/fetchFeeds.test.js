@@ -1,6 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { fetchArticles, fetchFeedXml, hydrateMissingImages } from "../src/feeds/fetchFeeds.js";
+
+test("feed modules do not replace Node's global fetch dispatcher", () => {
+  const moduleUrls = [
+    new URL("../src/feeds/fetchFeeds.js", import.meta.url).href,
+    new URL("../src/feeds/syncOvercastSubscriptions.js", import.meta.url).href
+  ];
+  const script = `
+    const dispatcherSymbol = Symbol.for("undici.globalDispatcher.1");
+    const originalDispatcher = globalThis[dispatcherSymbol];
+    await Promise.all(${JSON.stringify(moduleUrls)}.map((moduleUrl) => import(moduleUrl)));
+
+    if (globalThis[dispatcherSymbol] !== originalDispatcher) {
+      throw new Error("Importing feed parsers replaced Node's global fetch dispatcher");
+    }
+  `;
+
+  execFileSync(process.execPath, ["--input-type=module", "--eval", script], { stdio: "pipe" });
+});
 
 test("retries retryable feed failures", async () => {
   let calls = 0;

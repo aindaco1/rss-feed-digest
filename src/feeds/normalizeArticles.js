@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import * as cheerio from "cheerio";
+import * as cheerio from "cheerio/slim";
 import {
   firstImageFromHtml,
   htmlToText,

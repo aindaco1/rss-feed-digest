@@ -1,4 +1,4 @@
-import * as cheerio from "cheerio";
+import * as cheerio from "cheerio/slim";
 
 export function cleanWhitespace(value = "") {
   return String(value).replace(/\s+/g, " ").trim();

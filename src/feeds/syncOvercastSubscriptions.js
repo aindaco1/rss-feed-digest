@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as cheerio from "cheerio";
+import * as cheerio from "cheerio/slim";
 import { mapLimit } from "../util/concurrency.js";
 import { discardResponseBody } from "../util/fetch.js";
 
