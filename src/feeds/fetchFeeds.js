@@ -8,6 +8,7 @@ const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)";
 const BROWSER_FALLBACK_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+const UNAVAILABLE_STATUSES = new Set([404, 410]);
 const RETRYABLE_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504]);
 
 const parser = new Parser({
@@ -43,9 +44,18 @@ export async function fetchArticles(config, window, options = {}) {
 
   const articles = [];
   const failures = [];
+  const skippedFeeds = config.feeds.filter((feed) => feed.disabled);
 
   for (const result of results) {
     if (result.error) {
+      if (shouldSkipUnavailableSubscriptionFeed(result.feed, result.error, options)) {
+        skippedFeeds.push({
+          ...result.feed,
+          skipReason: result.error.message
+        });
+        continue;
+      }
+
       failures.push({
         title: result.feed.title,
         feedUrl: result.feed.feedUrl,
@@ -60,8 +70,17 @@ export async function fetchArticles(config, window, options = {}) {
   return {
     articles: dedupeArticles(articles),
     failures,
-    skippedFeeds: config.feeds.filter((feed) => feed.disabled)
+    skippedFeeds
   };
+}
+
+function shouldSkipUnavailableSubscriptionFeed(feed, error, options = {}) {
+  if (!UNAVAILABLE_STATUSES.has(error?.status)) return false;
+
+  const env = options.env || process.env;
+  if (feed.source === "podcast") return env.OVERCAST_SKIP_UNAVAILABLE !== "false";
+  if (feed.source === "youtube") return env.YOUTUBE_SKIP_UNAVAILABLE !== "false";
+  return false;
 }
 
 async function fetchConfiguredFeedXml(feed, window, options = {}) {
