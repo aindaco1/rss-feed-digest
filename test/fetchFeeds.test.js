@@ -43,6 +43,103 @@ test("retries retryable feed failures", async () => {
   assert.match(xml, /<rss>/);
 });
 
+test("skips unavailable generated subscription feeds without hiding static feed failures", async () => {
+  const window = {
+    start: new Date("2026-08-13T13:00:00.000Z"),
+    end: new Date("2026-08-14T13:00:00.000Z")
+  };
+
+  const { failures, skippedFeeds } = await fetchArticles(
+    {
+      feeds: [
+        {
+          title: "Unavailable Podcast",
+          feedUrl: "https://podcasts.example.com/missing.xml",
+          siteUrl: "https://podcasts.example.com/",
+          topic: "Podcasts",
+          source: "podcast"
+        },
+        {
+          title: "Unavailable Static Feed",
+          feedUrl: "https://news.example.com/missing.xml",
+          siteUrl: "https://news.example.com/",
+          topic: "News"
+        }
+      ]
+    },
+    window,
+    {
+      concurrency: 1,
+      attempts: 1,
+      env: {
+        FEEDBIN_EMAIL: "reader@example.com",
+        FEEDBIN_PASSWORD: "password",
+        FEEDBIN_API_BASE: "https://api.feedbin.test/v2"
+      },
+      fetchImpl: async (url) => {
+        if (String(url) === "https://api.feedbin.test/v2/subscriptions.json") {
+          return Response.json([]);
+        }
+
+        return new Response("Not found", { status: 404 });
+      }
+    }
+  );
+
+  assert.deepEqual(
+    skippedFeeds.map((feed) => ({ title: feed.title, skipReason: feed.skipReason })),
+    [
+      {
+        title: "Unavailable Podcast",
+        skipReason: "Status code 404; Feedbin fallback failed: No matching subscription"
+      }
+    ]
+  );
+  assert.deepEqual(failures, [
+    {
+      title: "Unavailable Static Feed",
+      feedUrl: "https://news.example.com/missing.xml",
+      message: "Status code 404; Feedbin fallback failed: No matching subscription"
+    }
+  ]);
+});
+
+test("honors the opt-out of unavailable generated subscription skipping", async () => {
+  const window = {
+    start: new Date("2026-08-13T13:00:00.000Z"),
+    end: new Date("2026-08-14T13:00:00.000Z")
+  };
+
+  const { failures, skippedFeeds } = await fetchArticles(
+    {
+      feeds: [
+        {
+          title: "Unavailable Podcast",
+          feedUrl: "https://podcasts.example.com/missing.xml",
+          siteUrl: "https://podcasts.example.com/",
+          topic: "Podcasts",
+          source: "podcast"
+        }
+      ]
+    },
+    window,
+    {
+      attempts: 1,
+      env: { OVERCAST_SKIP_UNAVAILABLE: "false" },
+      fetchImpl: async () => new Response("Gone", { status: 410 })
+    }
+  );
+
+  assert.equal(skippedFeeds.length, 0);
+  assert.deepEqual(failures, [
+    {
+      title: "Unavailable Podcast",
+      feedUrl: "https://podcasts.example.com/missing.xml",
+      message: "Status code 410"
+    }
+  ]);
+});
+
 test("discards unused feed response body before throwing status errors", async () => {
   let cancelled = false;
 

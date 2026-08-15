@@ -25,8 +25,14 @@ const allowPartialSend = hasFlag(args, "allow-feed-failures") || process.env.ALL
 console.log(`Digest window: ${window.startLabel} -> ${window.endLabel}`);
 console.log(`Mode: ${dryRun ? "dry-run" : "send"}`);
 
-const { articles, failures } = await fetchArticles(config, window);
+const { articles, failures, skippedFeeds } = await fetchArticles(config, window);
 console.log(`Fetched ${articles.length} articles from ${config.feeds.length} feeds.`);
+
+const unavailableSubscriptionFeeds = skippedFeeds.filter((feed) => feed.skipReason);
+if (unavailableSubscriptionFeeds.length) {
+  console.warn(`Skipped unavailable subscription feeds: ${unavailableSubscriptionFeeds.length}`);
+  unavailableSubscriptionFeeds.forEach((feed) => console.warn(`- ${feed.title}: ${feed.skipReason}`));
+}
 
 if (failures.length) {
   console.warn(`Feed failures: ${failures.length}`);
