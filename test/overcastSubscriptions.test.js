@@ -118,7 +118,8 @@ test("syncs Overcast OPML to generated podcast feed config", async () => {
     outputPath,
     opml: sampleOpml,
     topic: "Podcasts",
-    maxSubscriptions: 1
+    maxSubscriptions: 1,
+    skipUnavailable: false
   });
   const generated = JSON.parse(readFileSync(outputPath, "utf8"));
 

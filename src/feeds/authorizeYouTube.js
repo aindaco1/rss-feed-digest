@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import http from "node:http";
-import { pathToFileURL } from "node:url";
+import { isDirectRun } from "../util/modules.js";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -125,7 +125,7 @@ async function exchangeCodeForToken({ clientId, clientSecret, code, redirectUri,
   return payload;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectRun(import.meta.url)) {
   try {
     await authorizeYouTube();
   } catch (error) {

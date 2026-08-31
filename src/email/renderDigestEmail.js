@@ -1,4 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { isWebUrl } from "../util/urls.js";
+import { isDirectRun } from "../util/modules.js";
 
 const SUMMARY_LIMIT = 280;
 const CARD_ESTIMATE = {
@@ -60,15 +62,6 @@ function escapeHtml(value = "") {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
-}
-
-function isWebUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function renderSources(sources = []) {
@@ -300,9 +293,7 @@ export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, 
 </html>`;
 }
 
-const isDirectRun = process.argv[1]?.endsWith("renderDigestEmail.js");
-
-if (isDirectRun) {
+if (isDirectRun(import.meta.url)) {
   const html = renderDigestEmail({
     dateLabel: "06/01/2026",
     intro: "A sample email shell using the DIY Filmmaker digest rhythm: bold header, image-led cards, tight source metadata, and strong topic dividers.",

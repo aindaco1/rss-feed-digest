@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import * as cheerio from "cheerio/slim";
 import {
   firstImageFromHtml,
@@ -8,6 +7,8 @@ import {
   normalizeImageUrl,
   isLikelyNonArticleImageUrl
 } from "../util/html.js";
+import { isWebUrl } from "../util/urls.js";
+import { digestHash } from "../util/hash.js";
 
 const TRACKING_PARAMS = new Set([
   "fbclid",
@@ -72,7 +73,7 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
   });
 
   return {
-    id: hash(`${feedConfig.feedUrl}:${canonicalUrl}:${rawTitle}`),
+    id: digestHash(`${feedConfig.feedUrl}:${canonicalUrl}:${rawTitle}`),
     title,
     url,
     canonicalUrl,
@@ -155,15 +156,6 @@ function cleanStringCandidate(value) {
     return cleanWhitespace(String(value));
   } catch {
     return "";
-  }
-}
-
-function isWebUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
   }
 }
 
@@ -625,8 +617,4 @@ export function stripFeedBoilerplate(value, options = {}) {
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function hash(value) {
-  return crypto.createHash("sha256").update(value).digest("hex").slice(0, 16);
 }

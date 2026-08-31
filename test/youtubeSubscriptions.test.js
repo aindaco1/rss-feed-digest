@@ -130,9 +130,10 @@ test("skips unavailable YouTube subscription feeds by default", async () => {
     env: {
       YOUTUBE_CLIENT_ID: "client-id",
       YOUTUBE_CLIENT_SECRET: "client-secret",
-      YOUTUBE_REFRESH_TOKEN: "refresh-token"
+      YOUTUBE_REFRESH_TOKEN: "refresh-token",
+      FEED_USER_AGENT: "Digest Availability Checker/1.0"
     },
-    fetchImpl: async (url) => {
+    fetchImpl: async (url, options = {}) => {
       const urlString = String(url);
 
       if (urlString === "https://oauth2.googleapis.com/token") {
@@ -159,6 +160,7 @@ test("skips unavailable YouTube subscription feeds by default", async () => {
       }
 
       checkedFeeds.push(urlString);
+      assert.equal(options.headers["user-agent"], "Digest Availability Checker/1.0");
       if (urlString.includes("UCdeleted")) return new Response("", { status: 404 });
       return new Response("<feed></feed>", { status: 200 });
     }

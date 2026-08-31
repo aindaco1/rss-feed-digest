@@ -1,56 +1,13 @@
-const REQUIRED_FOR_SEND = [
-  "OPENAI_API_KEY",
-  "RESEND_API_KEY",
-  "DIGEST_FROM_EMAIL",
-  "DIGEST_TO_EMAIL",
-  "FEEDBIN_EMAIL",
-  "FEEDBIN_PASSWORD"
-];
+import {
+  OPTIONAL_VARIABLES,
+  OVERCAST_OPML_SOURCES,
+  REQUIRED_FOR_SEND,
+  REQUIRED_FOR_YOUTUBE_SYNC,
+  evaluateEnvironment
+} from "./environment.js";
 
-const OPTIONAL = [
-  "OPENAI_MODEL",
-  "OPENAI_EMBEDDING_MODEL",
-  "USE_EMBEDDINGS",
-  "FETCH_OG_IMAGES",
-  "FEED_CONCURRENCY",
-  "FEED_FETCH_ATTEMPTS",
-  "FEEDBIN_PER_PAGE",
-  "FEEDBIN_SYNC_SUBSCRIPTIONS",
-  "FEEDBIN_SYNC_EXTRA_TITLES",
-  "SUBSTACK_ARCHIVE_LIMIT",
-  "ALLOW_PARTIAL_DIGEST_SEND",
-  "AI_MAX_CLUSTERS",
-  "AI_SUMMARIZE_SINGLE_ARTICLES",
-  "OVERCAST_SYNC_SUBSCRIPTIONS",
-  "OVERCAST_TOPIC",
-  "OVERCAST_MAX_SUBSCRIPTIONS",
-  "OVERCAST_MAX_EPISODES_PER_FEED",
-  "OVERCAST_OPML_ENCRYPTED_PATH",
-  "OVERCAST_SKIP_UNAVAILABLE",
-  "OVERCAST_CHECK_CONCURRENCY",
-  "OVERCAST_CHECK_TIMEOUT_MS",
-  "OVERCAST_SUBSCRIPTIONS_PATH",
-  "YOUTUBE_SYNC_SUBSCRIPTIONS",
-  "YOUTUBE_SYNC_REQUIRED",
-  "YOUTUBE_TOPIC",
-  "YOUTUBE_MAX_SUBSCRIPTIONS",
-  "YOUTUBE_SKIP_UNAVAILABLE",
-  "YOUTUBE_CHECK_CONCURRENCY",
-  "YOUTUBE_CHECK_TIMEOUT_MS",
-  "YOUTUBE_SUBSCRIPTIONS_PATH",
-  "VIDEO_LITE_URL_TEMPLATE"
-];
-
-const REQUIRED_FOR_YOUTUBE_SYNC = ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"];
-const OVERCAST_OPML_SOURCES = ["OVERCAST_OPML_BASE64", "OVERCAST_OPML", "OVERCAST_OPML_PATH"];
-const youtubeSyncEnabled = process.env.YOUTUBE_SYNC_SUBSCRIPTIONS === "true";
-const youtubeSyncRequired = process.env.YOUTUBE_SYNC_REQUIRED === "true";
-const overcastSyncEnabled = process.env.OVERCAST_SYNC_SUBSCRIPTIONS === "true";
-const required = youtubeSyncEnabled && youtubeSyncRequired ? [...REQUIRED_FOR_SEND, ...REQUIRED_FOR_YOUTUBE_SYNC] : REQUIRED_FOR_SEND;
-const missing = [
-  ...required.filter((name) => !process.env[name]),
-  ...(overcastSyncEnabled && !OVERCAST_OPML_SOURCES.some((name) => process.env[name]) ? ["one Overcast OPML source"] : [])
-];
+const { missing, overcastSyncEnabled, youtubeSyncEnabled, youtubeSyncRequired } =
+  evaluateEnvironment(process.env);
 
 console.log("Required for scheduled send:");
 for (const name of REQUIRED_FOR_SEND) {
@@ -58,7 +15,7 @@ for (const name of REQUIRED_FOR_SEND) {
 }
 
 console.log("\nOptional:");
-for (const name of OPTIONAL) {
+for (const name of OPTIONAL_VARIABLES) {
   console.log(`- ${name}: ${process.env[name] ? "set" : "default"}`);
 }
 

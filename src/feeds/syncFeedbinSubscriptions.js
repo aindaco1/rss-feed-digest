@@ -1,8 +1,8 @@
-import { pathToFileURL } from "node:url";
 import { loadConfig } from "../config/loadConfig.js";
 import { discardResponseBody } from "../util/fetch.js";
+import { isDirectRun } from "../util/modules.js";
+import { feedbinApiUrl, feedbinAuthorization } from "./feedbin.js";
 
-const DEFAULT_API_BASE = "https://api.feedbin.com/v2";
 const DEFAULT_ATTEMPTS = 4;
 const DEFAULT_TIMEOUT_MS = 30000;
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -107,8 +107,7 @@ async function createSubscription(feedUrl, options) {
 
 async function feedbinFetch(path, requestOptions, options) {
   const env = options.env;
-  const apiBase = String(options.apiBase || env.FEEDBIN_API_BASE || DEFAULT_API_BASE).replace(/\/+$/, "");
-  const url = new URL(path.replace(/^\//, ""), `${apiBase}/`);
+  const url = feedbinApiUrl(path, options);
   const attempts = positiveInteger(
     options.attempts ?? env.FEEDBIN_SYNC_ATTEMPTS ?? env.FEED_FETCH_ATTEMPTS,
     DEFAULT_ATTEMPTS
@@ -130,7 +129,7 @@ async function feedbinFetch(path, requestOptions, options) {
         signal: controller.signal,
         headers: {
           accept: "application/json",
-          authorization: authorizationHeader(env),
+          authorization: feedbinAuthorization(env),
           ...requestOptions.headers
         }
       });
@@ -161,10 +160,6 @@ async function feedbinFetch(path, requestOptions, options) {
   }
 
   throw lastError;
-}
-
-function authorizationHeader(env) {
-  return `Basic ${Buffer.from(`${env.FEEDBIN_EMAIL}:${env.FEEDBIN_PASSWORD}`).toString("base64")}`;
 }
 
 function extraSyncTitlesFromEnv(env) {
@@ -245,7 +240,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectRun(import.meta.url)) {
   try {
     const results = await syncFeedbinSubscriptions();
     if (results.failed) process.exitCode = 1;

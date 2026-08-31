@@ -2,13 +2,15 @@ import Parser from "rss-parser";
 import { mapLimit } from "../util/concurrency.js";
 import { discardResponseBody } from "../util/fetch.js";
 import { firstImageFromHtml, metaImageFromHtml } from "../util/html.js";
+import { isWebUrl } from "../util/urls.js";
 import { isLikelySponsoredPost, normalizeFeedItems } from "./normalizeArticles.js";
+import { feedbinApiUrl, feedbinAuthorization } from "./feedbin.js";
+import { shouldSkipUnavailableGeneratedFeed } from "./generatedSubscriptions.js";
 
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)";
 const BROWSER_FALLBACK_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
-const UNAVAILABLE_STATUSES = new Set([404, 410]);
 const RETRYABLE_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504]);
 
 const parser = new Parser({
@@ -26,7 +28,8 @@ const parser = new Parser({
 });
 
 export async function fetchArticles(config, window, options = {}) {
-  const concurrency = Number(options.concurrency || process.env.FEED_CONCURRENCY || 8);
+  const env = options.env || process.env;
+  const concurrency = Number(options.concurrency || env.FEED_CONCURRENCY || 8);
   const activeFeeds = config.feeds.filter((feed) => !feed.disabled);
   const results = await mapLimit(activeFeeds, concurrency, async (feed) => {
     try {
@@ -48,7 +51,7 @@ export async function fetchArticles(config, window, options = {}) {
 
   for (const result of results) {
     if (result.error) {
-      if (shouldSkipUnavailableSubscriptionFeed(result.feed, result.error, options)) {
+      if (shouldSkipUnavailableGeneratedFeed(result.feed, result.error, options.env || process.env)) {
         skippedFeeds.push({
           ...result.feed,
           skipReason: result.error.message
@@ -74,15 +77,6 @@ export async function fetchArticles(config, window, options = {}) {
   };
 }
 
-function shouldSkipUnavailableSubscriptionFeed(feed, error, options = {}) {
-  if (!UNAVAILABLE_STATUSES.has(error?.status)) return false;
-
-  const env = options.env || process.env;
-  if (feed.source === "podcast") return env.OVERCAST_SKIP_UNAVAILABLE !== "false";
-  if (feed.source === "youtube") return env.YOUTUBE_SKIP_UNAVAILABLE !== "false";
-  return false;
-}
-
 async function fetchConfiguredFeedXml(feed, window, options = {}) {
   if (shouldPreferFeedbinForWindow(feed, window, options)) {
     try {
@@ -96,7 +90,8 @@ async function fetchConfiguredFeedXml(feed, window, options = {}) {
 }
 
 export async function fetchFeedXml(feedUrl, options = {}) {
-  const attempts = Number(options.attempts || process.env.FEED_FETCH_ATTEMPTS || 3);
+  const env = options.env || process.env;
+  const attempts = Number(options.attempts || env.FEED_FETCH_ATTEMPTS || 3);
   let lastError;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -151,7 +146,7 @@ async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
     const response = await fetchImpl(feedUrl, {
       signal: controller.signal,
       redirect: "follow",
-      headers: requestHeaders(options.headers, attempt)
+      headers: requestHeaders(options.headers, attempt, options.env)
     });
 
     if (!response.ok) {
@@ -173,7 +168,8 @@ async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
 }
 
 export async function hydrateMissingImages(articles, options = {}) {
-  const concurrency = Number(options.concurrency || process.env.IMAGE_CONCURRENCY || 5);
+  const env = options.env || process.env;
+  const concurrency = Number(options.concurrency || env.IMAGE_CONCURRENCY || 5);
   const missing = articles.filter((article) => !article.imageUrl || shouldHydrateFromPage(article.imageUrl));
 
   await mapLimit(missing, concurrency, async (article) => {
@@ -190,9 +186,10 @@ export async function hydrateMissingImages(articles, options = {}) {
 }
 
 async function filterSponsoredArticlePages(articles, options = {}) {
-  if (process.env.FETCH_SPONSORED_CHECKS === "false") return articles;
+  const env = options.env || process.env;
+  if (env.FETCH_SPONSORED_CHECKS === "false") return articles;
 
-  const concurrency = Number(options.sponsoredCheckConcurrency || process.env.SPONSORED_CHECK_CONCURRENCY || 3);
+  const concurrency = Number(options.sponsoredCheckConcurrency || env.SPONSORED_CHECK_CONCURRENCY || 3);
   const checks = await mapLimit(articles, concurrency, async (article) => ({
     article,
     sponsored: await isSponsoredArticlePage(article, options)
@@ -214,15 +211,27 @@ async function isSponsoredArticlePage(article, options = {}) {
 }
 
 async function fetchArticleHtml(url, options = {}) {
+  const page = await fetchHtmlPage(url, {
+    ...options,
+    timeoutMs: Number(options.sponsoredCheckTimeoutMs || 8000)
+  });
+  return page?.html || null;
+}
+
+async function fetchHtmlPage(url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.sponsoredCheckTimeoutMs || 8000));
+  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 8000));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
     const response = await fetchImpl(url, {
       signal: controller.signal,
       redirect: "follow",
-      headers: requestHeaders({ accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" })
+      headers: requestHeaders(
+        { accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+        1,
+        options.env
+      )
     });
 
     if (!response.ok) {
@@ -236,7 +245,10 @@ async function fetchArticleHtml(url, options = {}) {
       return null;
     }
 
-    return (await response.text()).slice(0, 500000);
+    return {
+      html: (await response.text()).slice(0, 500000),
+      url: response.url || url
+    };
   } catch {
     return null;
   } finally {
@@ -267,36 +279,13 @@ function dedupeArticles(articles) {
 }
 
 async function fetchMetaImage(url, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.metaImageTimeoutMs || 8000));
-  const fetchImpl = options.fetchImpl || fetch;
+  const page = await fetchHtmlPage(url, {
+    ...options,
+    timeoutMs: Number(options.metaImageTimeoutMs || 8000)
+  });
+  if (!page) return null;
 
-  try {
-    const response = await fetchImpl(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: requestHeaders({ accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" })
-    });
-
-    if (!response.ok) {
-      await discardResponseBody(response);
-      return null;
-    }
-
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("text/html")) {
-      await discardResponseBody(response);
-      return null;
-    }
-
-    const html = (await response.text()).slice(0, 500000);
-    const pageUrl = response.url || url;
-    return metaImageFromHtml(html, pageUrl) || firstImageFromHtml(html, { baseUrl: pageUrl });
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return metaImageFromHtml(page.html, page.url) || firstImageFromHtml(page.html, { baseUrl: page.url });
 }
 
 async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
@@ -305,7 +294,8 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
   archiveUrl.searchParams.set("sort", "new");
   archiveUrl.searchParams.set("search", "");
   archiveUrl.searchParams.set("offset", "0");
-  archiveUrl.searchParams.set("limit", String(options.substackArchiveLimit || process.env.SUBSTACK_ARCHIVE_LIMIT || 30));
+  const env = options.env || process.env;
+  archiveUrl.searchParams.set("limit", String(options.substackArchiveLimit || env.SUBSTACK_ARCHIVE_LIMIT || 30));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
@@ -315,7 +305,7 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
     const response = await fetchImpl(archiveUrl, {
       signal: controller.signal,
       redirect: "follow",
-      headers: requestHeaders({ accept: "application/json, text/plain, */*" }, 2)
+      headers: requestHeaders({ accept: "application/json, text/plain, */*" }, 2, env)
     });
 
     if (!response.ok) {
@@ -379,7 +369,7 @@ async function fetchFeedbinJson(url, options = {}) {
       redirect: "follow",
       headers: {
         accept: "application/json",
-        authorization: feedbinAuthorization(options)
+        authorization: feedbinAuthorization(options.env || process.env)
       }
     });
 
@@ -394,13 +384,13 @@ async function fetchFeedbinJson(url, options = {}) {
   }
 }
 
-function requestHeaders(overrides = {}, attempt = 1) {
+function requestHeaders(overrides = {}, attempt = 1, env = process.env) {
   return {
     accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
     "accept-language": "en-US,en;q=0.9",
     "cache-control": "no-cache",
     pragma: "no-cache",
-    "user-agent": process.env.FEED_USER_AGENT || (attempt > 1 ? BROWSER_FALLBACK_USER_AGENT : DEFAULT_USER_AGENT),
+    "user-agent": env?.FEED_USER_AGENT || (attempt > 1 ? BROWSER_FALLBACK_USER_AGENT : DEFAULT_USER_AGENT),
     ...overrides
   };
 }
@@ -426,7 +416,7 @@ function errorMessage(error) {
 
 function fetchTimeoutMs(options = {}) {
   const env = options.env || process.env;
-  return Number(options.timeoutMs ?? env.FEED_FETCH_TIMEOUT_MS ?? 15000);
+  return Number(options.timeoutMs ?? env.FEED_FETCH_TIMEOUT_MS ?? 30000);
 }
 
 function isRetryableFetchError(error) {
@@ -435,8 +425,9 @@ function isRetryableFetchError(error) {
 }
 
 function retryDelayMs(attempt, options) {
-  const base = Number(options.retryBaseDelayMs ?? process.env.FEED_RETRY_BASE_DELAY_MS ?? 750);
-  const jitter = Number(options.retryJitterMs ?? process.env.FEED_RETRY_JITTER_MS ?? 250);
+  const env = options.env || process.env;
+  const base = Number(options.retryBaseDelayMs ?? env.FEED_RETRY_BASE_DELAY_MS ?? 750);
+  const jitter = Number(options.retryJitterMs ?? env.FEED_RETRY_JITTER_MS ?? 250);
   return base * 2 ** (attempt - 1) + Math.floor(Math.random() * jitter);
 }
 
@@ -471,17 +462,6 @@ function shouldPreferFeedbinForWindow(feed, window, options = {}) {
   const now = options.now ? new Date(options.now) : new Date();
   if (Number.isNaN(now.getTime())) return false;
   return now.getTime() - window.end.getTime() >= backfillAfterHours * 60 * 60 * 1000;
-}
-
-function feedbinAuthorization(options = {}) {
-  const env = options.env || process.env;
-  return `Basic ${Buffer.from(`${env.FEEDBIN_EMAIL}:${env.FEEDBIN_PASSWORD}`).toString("base64")}`;
-}
-
-function feedbinApiUrl(path, options = {}) {
-  const env = options.env || process.env;
-  const baseUrl = env.FEEDBIN_API_BASE || "https://api.feedbin.com/v2";
-  return new URL(path.replace(/^\//, ""), `${baseUrl.replace(/\/+$/, "")}/`);
 }
 
 function findMatchingFeedbinSubscription(feedUrl, subscriptions) {
@@ -600,15 +580,6 @@ function imageFromFeedbinEntry(entry) {
   }
 
   return null;
-}
-
-function isWebUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function substackPostsToRssXml(feed, posts) {

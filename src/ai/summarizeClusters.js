@@ -3,41 +3,45 @@ import { mapLimit } from "../util/concurrency.js";
 import { appLinkForArticle } from "../util/appLinks.js";
 
 export async function summarizeClusters(clusters, config, options = {}) {
+  const env = options.env || process.env;
   const topicOrder = config.topics;
   const useAI = Boolean(options.apiKey) && !options.disableAI;
-  const model = options.model || process.env.OPENAI_MODEL || "gpt-4.1-mini";
-  const aiMaxClusters = Number(process.env.AI_MAX_CLUSTERS || 80);
-  const summarizeAll = process.env.AI_SUMMARIZE_SINGLE_ARTICLES === "true";
+  const model = options.model || env.OPENAI_MODEL || "gpt-4.1-mini";
+  const aiMaxClusters = Number(env.AI_MAX_CLUSTERS || 80);
+  const summarizeAll = env.AI_SUMMARIZE_SINGLE_ARTICLES === "true";
   const client = useAI ? options.client || new OpenAI({ apiKey: options.apiKey }) : null;
   let aiCalls = 0;
 
-  const digestArticles = await mapLimit(clusters, Number(process.env.AI_CONCURRENCY || 2), async (cluster) => {
+  const digestArticles = await mapLimit(clusters, Number(env.AI_CONCURRENCY || 2), async (cluster) => {
     const shouldUseAI = client && (summarizeAll || cluster.articles.length > 1) && aiCalls < aiMaxClusters;
-    if (!shouldUseAI) return fallbackDigestArticle(cluster);
+    if (!shouldUseAI) return fallbackDigestArticle(cluster, env);
 
     aiCalls += 1;
     try {
       const aiArticle = await summarizeClusterWithAI(client, model, cluster, topicOrder);
       return {
-        ...fallbackDigestArticle(cluster),
+        ...fallbackDigestArticle(cluster, env),
         headline: aiArticle.headline,
         summary: aiArticle.summary,
         topic: aiArticle.topic
       };
     } catch (error) {
       console.warn(`AI summary failed for cluster ${cluster.id}: ${error.message}`);
-      return fallbackDigestArticle(cluster);
+      return fallbackDigestArticle(cluster, env);
     }
   });
 
-  const grouped = topicOrder
-    .map((topicName) => ({
-      name: topicName,
-      articles: digestArticles
-        .filter((article) => article.topic === topicName)
-        .sort((a, b) => new Date(b.latestPublishedAt) - new Date(a.latestPublishedAt))
-    }))
-    .filter((topic) => topic.articles.length > 0);
+  const articlesByTopic = new Map(topicOrder.map((topicName) => [topicName, []]));
+  for (const article of digestArticles) {
+    articlesByTopic.get(article.topic)?.push(article);
+  }
+
+  const grouped = topicOrder.flatMap((topicName) => {
+    const articles = articlesByTopic
+      .get(topicName)
+      .sort((a, b) => new Date(b.latestPublishedAt) - new Date(a.latestPublishedAt));
+    return articles.length ? [{ name: topicName, articles }] : [];
+  });
 
   return {
     topics: grouped,
@@ -46,12 +50,12 @@ export async function summarizeClusters(clusters, config, options = {}) {
   };
 }
 
-function fallbackDigestArticle(cluster) {
+function fallbackDigestArticle(cluster, env) {
   const articles = [...cluster.articles].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
   const lead = articles[0];
   const sourceNames = [...new Set(articles.map((article) => article.sourceName))];
   const multiSourceLead = sourceNames.length > 1 ? `Coverage from ${sourceNames.join(", ")}. ` : "";
-  const appLink = appLinkForArticle(lead);
+  const appLink = appLinkForArticle(lead, env);
 
   return {
     id: cluster.id,
@@ -65,7 +69,7 @@ function fallbackDigestArticle(cluster) {
     imageAlt: lead.title,
     latestPublishedAt: cluster.latestPublishedAt,
     sources: articles.map((article) => {
-      const sourceAppLink = appLinkForArticle(article);
+      const sourceAppLink = appLinkForArticle(article, env);
       return {
         name: article.sourceName,
         title: article.title,

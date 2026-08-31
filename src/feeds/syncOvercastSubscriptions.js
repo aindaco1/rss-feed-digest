@@ -1,13 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
 import * as cheerio from "cheerio/slim";
-import { mapLimit } from "../util/concurrency.js";
-import { discardResponseBody } from "../util/fetch.js";
+import { isDirectRun } from "../util/modules.js";
+import {
+  filterUnavailableGeneratedFeeds,
+  pathString,
+  removeEmptyValues,
+  writeJson
+} from "./generatedSubscriptions.js";
 
 const DEFAULT_OUTPUT_URL = new URL("../../config/podcast-subscriptions.json", import.meta.url);
 const DEFAULT_MAX_EPISODES_PER_FEED = 0;
-const UNAVAILABLE_STATUSES = new Set([404, 410]);
 
 export async function syncOvercastSubscriptions(options = {}) {
   const env = options.env || process.env;
@@ -22,8 +24,9 @@ export async function syncOvercastSubscriptions(options = {}) {
   const { activeFeeds, skippedFeeds } =
     options.skipUnavailable === false || env.OVERCAST_SKIP_UNAVAILABLE === "false"
       ? { activeFeeds: feeds, skippedFeeds: [] }
-      : await filterUnavailablePodcastFeeds(feeds, {
+      : await filterUnavailableGeneratedFeeds(feeds, {
           fetchImpl: options.fetchImpl || fetch,
+          env,
           concurrency: Number(options.checkConcurrency || env.OVERCAST_CHECK_CONCURRENCY || 5),
           timeoutMs: Number(options.timeoutMs || env.OVERCAST_CHECK_TIMEOUT_MS || 8000)
         });
@@ -101,48 +104,6 @@ export function readOvercastOpml(env = process.env) {
   }
 
   throw new Error("Set OVERCAST_OPML_BASE64, OVERCAST_OPML, or OVERCAST_OPML_PATH before running Overcast sync.");
-}
-
-async function filterUnavailablePodcastFeeds(feeds, options = {}) {
-  const checks = await mapLimit(feeds, options.concurrency || 5, async (feed) => {
-    const unavailable = await unavailablePodcastFeed(feed, options);
-    return { feed, unavailable };
-  });
-
-  return {
-    activeFeeds: checks.filter((check) => !check.unavailable).map((check) => check.feed),
-    skippedFeeds: checks
-      .filter((check) => check.unavailable)
-      .map((check) => ({
-        title: check.feed.title,
-        feedUrl: check.feed.feedUrl,
-        reason: check.unavailable
-      }))
-  };
-}
-
-async function unavailablePodcastFeed(feed, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 8000);
-  const fetchImpl = options.fetchImpl || fetch;
-
-  try {
-    const response = await fetchImpl(feed.feedUrl, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-        "user-agent": process.env.FEED_USER_AGENT || "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)"
-      }
-    });
-
-    await discardResponseBody(response);
-    return UNAVAILABLE_STATUSES.has(response.status) ? `Status code ${response.status}` : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 function cleanAttribute(value) {
@@ -237,19 +198,7 @@ function hostnameTitle(rawUrl) {
   }
 }
 
-function removeEmptyValues(value) {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, fieldValue]) => fieldValue !== null && fieldValue !== undefined && fieldValue !== "")
-  );
-}
-
-function writeJson(outputPath, payload) {
-  const path = outputPath instanceof URL ? fileURLToPath(outputPath) : String(outputPath);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectRun(import.meta.url)) {
   try {
     const result = await syncOvercastSubscriptions();
     if (result.skippedCount) {
@@ -260,8 +209,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error(error.message);
     process.exit(1);
   }
-}
-
-function pathString(value) {
-  return value instanceof URL ? fileURLToPath(value) : String(value);
 }

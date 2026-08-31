@@ -18,6 +18,8 @@ Generated files are written to `out/`:
 - `digest-YYYY-MM-DD.html`
 - `digest-YYYY-MM-DD.json`
 
+The JSON artifact records ordinary feed failures separately from disabled or unavailable generated feeds, along with article, cluster, and AI-call counts.
+
 ## Sending
 
 Set these secrets locally or in GitHub Actions:
@@ -27,6 +29,8 @@ OPENAI_API_KEY=...
 RESEND_API_KEY=...
 DIGEST_FROM_EMAIL="Alonso's Daily Digest <digest@example.com>"
 DIGEST_TO_EMAIL="alonso@example.com"
+FEEDBIN_EMAIL=...
+FEEDBIN_PASSWORD=...
 ```
 
 Then run:
@@ -51,7 +55,7 @@ Datetimes without an offset are interpreted in `America/Denver`.
 
 ## GitHub Actions
 
-`.github/workflows/daily-digest.yml` runs every day at 7:00 AM America/Denver and also supports manual dispatch for backfills and dry-runs.
+`.github/workflows/daily-digest.yml` is scheduled for 7:00 AM America/Denver every day and also supports manual dispatch for backfills and dry-runs. GitHub Actions cron is best-effort and can start later than the scheduled time; use an external scheduler if exact delivery time is a hard requirement.
 
 GitHub Actions schedules are UTC-only, so the workflow has two cron triggers:
 
@@ -83,53 +87,7 @@ Optional Overcast podcast sync secrets:
 - `OVERCAST_OPML`
 - `OVERCAST_OPML_GPG_PASSPHRASE`
 
-Optional repository variables:
-
-- `OPENAI_MODEL`
-- `OPENAI_EMBEDDING_MODEL`
-- `FEED_CONCURRENCY`
-- `FEED_FETCH_ATTEMPTS`
-- `FEED_FETCH_TIMEOUT_MS`
-- `FEEDBIN_PER_PAGE`
-- `FEEDBIN_SYNC_SUBSCRIPTIONS`
-- `FEEDBIN_SYNC_EXTRA_TITLES`
-- `FEEDBIN_PREFER_FOR_BACKFILLS`
-- `FEEDBIN_BACKFILL_AFTER_HOURS`
-- `OVERCAST_SYNC_SUBSCRIPTIONS`
-- `OVERCAST_TOPIC`
-- `OVERCAST_MAX_SUBSCRIPTIONS`
-- `OVERCAST_MAX_EPISODES_PER_FEED`
-- `OVERCAST_OPML_ENCRYPTED_PATH`
-- `OVERCAST_SKIP_UNAVAILABLE`
-- `OVERCAST_CHECK_CONCURRENCY`
-- `YOUTUBE_SYNC_SUBSCRIPTIONS`
-- `YOUTUBE_SYNC_REQUIRED`
-- `YOUTUBE_TOPIC`
-- `YOUTUBE_MAX_SUBSCRIPTIONS`
-- `YOUTUBE_SKIP_UNAVAILABLE`
-- `YOUTUBE_CHECK_CONCURRENCY`
-- `YOUTUBE_CHECK_TIMEOUT_MS`
-- `VIDEO_LITE_URL_TEMPLATE`
-- `SUBSTACK_ARCHIVE_LIMIT`
-- `ALLOW_PARTIAL_DIGEST_SEND`
-- `USE_EMBEDDINGS`
-- `FETCH_OG_IMAGES`
-- `FETCH_SPONSORED_CHECKS`
-- `SPONSORED_CHECK_CONCURRENCY`
-- `CLUSTER_THRESHOLD`
-- `EMBEDDING_CLUSTER_THRESHOLD`
-- `CLUSTER_CROSS_SOURCE_STRONG_SEMANTIC_THRESHOLD`
-- `CLUSTER_CROSS_SOURCE_SEMANTIC_THRESHOLD`
-- `CLUSTER_CROSS_SOURCE_PHRASE_SEMANTIC_THRESHOLD`
-- `CLUSTER_CROSS_SOURCE_SPARSE_SEMANTIC_THRESHOLD`
-- `CLUSTER_SAME_SOURCE_STRONG_SEMANTIC_THRESHOLD`
-- `CLUSTER_SAME_SOURCE_SEMANTIC_THRESHOLD`
-- `CLUSTER_SAME_SOURCE_PHRASE_SEMANTIC_THRESHOLD`
-- `CLUSTER_SAME_SOURCE_LEAD_PHRASE_SEMANTIC_THRESHOLD`
-- `CLUSTER_MIN_SHARED_SIGNALS`
-- `CLUSTER_MIN_SHARED_PHRASES`
-- `CLUSTER_MIN_SHARED_STRONG_PHRASES`
-- `NO_BROAD_CLUSTER_TOPICS`
+Optional repository variables and their defaults are maintained in `.env.example` under **Optional scheduled-workflow variables**. The test suite verifies that every variable in that shared contract is forwarded by `.github/workflows/daily-digest.yml`, so a documented tuning value cannot silently become a no-op in scheduled runs.
 
 The workflow defaults `FEED_CONCURRENCY` to `2`, `FEED_FETCH_ATTEMPTS` to `4`, and `FEED_FETCH_TIMEOUT_MS` to `30000` to accommodate large feeds and reduce transient failures from feeds that throttle GitHub-hosted runners.
 If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
@@ -153,7 +111,7 @@ To test the automation without sending, run the workflow manually and keep `dry_
 npm run audit:feeds
 ```
 
-This performs a network check of each active feed and reports sources that are returning errors or HTML instead of RSS/Atom.
+This performs a network check of each active feed and reports sources that are returning errors or HTML instead of RSS/Atom. Generated YouTube or podcast feeds returning 404/410 are reported as skipped under the same policy used by digest generation; failures from configured static feeds remain fatal.
 
 Feed entries in `config/feeds.json` support these optional maintenance fields:
 

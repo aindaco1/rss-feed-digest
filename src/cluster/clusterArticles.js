@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import { digestHash } from "../util/hash.js";
 
 const STOP_WORDS = new Set([
   "a",
@@ -197,7 +197,7 @@ export function clusterArticles(articles, options = {}) {
     }
 
     clusters.push({
-      id: hash(article.id),
+      id: digestHash(article.id),
       topicHint: article.topicHint,
       latestPublishedAt: article.publishedAt,
       profiles: [articleProfile],
@@ -208,7 +208,7 @@ export function clusterArticles(articles, options = {}) {
   return mergeClusters(clusters, settings)
     .map((cluster) => ({
       ...cluster,
-      id: hash(cluster.articles.map((article) => article.id).sort().join(":")),
+      id: digestHash(cluster.articles.map((article) => article.id).sort().join(":")),
       topicHint: dominantTopic(cluster.articles)
     }))
     .sort((a, b) => new Date(b.latestPublishedAt) - new Date(a.latestPublishedAt));
@@ -341,7 +341,7 @@ function pairEvidence(a, b) {
   return {
     hasCommerceArticle: a.isCommerce || b.isCommerce,
     minutesApart: minutesApart(a.publishedAt, b.publishedAt),
-    semanticScore: weightedCosine(a.vector, b.vector),
+    semanticScore: weightedCosine(a.vector, b.vector, a.magnitude, b.magnitude),
     sharedSignals: intersectionSize(a.signals, b.signals),
     sharedPhraseSignals: intersectionSize(a.phraseSignals, b.phraseSignals),
     sharedTitleSignals: intersectionSize(a.titleSignals, b.titleSignals),
@@ -672,9 +672,7 @@ function idf(articleCount, frequency) {
   return Math.log((articleCount + 1) / (frequency + 0.5)) + 1;
 }
 
-function weightedCosine(a, b) {
-  const aMagnitude = magnitude(a);
-  const bMagnitude = magnitude(b);
+function weightedCosine(a, b, aMagnitude = magnitude(a), bMagnitude = magnitude(b)) {
   if (!aMagnitude || !bMagnitude) return 0;
 
   let dot = 0;
@@ -785,8 +783,4 @@ function isTopicExcluded(topic, excludedTopics) {
 
 function isStandaloneArticle(article) {
   return article.sourceType === "youtube";
-}
-
-function hash(value) {
-  return crypto.createHash("sha256").update(value).digest("hex").slice(0, 16);
 }

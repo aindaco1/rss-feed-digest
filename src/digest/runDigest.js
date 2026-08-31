@@ -1,5 +1,4 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config/loadConfig.js";
 import { fetchArticles, hydrateMissingImages } from "../feeds/fetchFeeds.js";
@@ -10,6 +9,7 @@ import { renderDigestEmail } from "../email/renderDigestEmail.js";
 import { sendDigestEmail } from "../email/sendDigestEmail.js";
 import { parseArgs, hasFlag, hasNegativeFlag } from "../util/args.js";
 import { resolveDigestWindow } from "../util/dates.js";
+import { digestHash } from "../util/hash.js";
 
 const args = parseArgs();
 const config = loadConfig();
@@ -90,6 +90,11 @@ writeFileSync(
         dateLabel: window.dateLabel
       },
       failures,
+      skippedFeeds: skippedFeeds.map((feed) => ({
+        title: feed.title,
+        feedUrl: feed.feedUrl,
+        reason: feed.skipReason || feed.disabledReason || "disabled"
+      })),
       articleCount: articles.length,
       clusterCount: clusters.length,
       aiCalls: digest.aiCalls,
@@ -111,7 +116,7 @@ if (!dryRun) {
     process.exit(1);
   }
 
-  const idempotencyKey = `daily-digest/${window.slug}/${shortHash(
+  const idempotencyKey = `daily-digest/${window.slug}/${digestHash(
     JSON.stringify({
       from: process.env.DIGEST_FROM_EMAIL,
       to: process.env.DIGEST_TO_EMAIL,
@@ -124,7 +129,3 @@ if (!dryRun) {
 }
 
 process.exit(0);
-
-function shortHash(value) {
-  return createHash("sha256").update(value).digest("hex").slice(0, 16);
-}
