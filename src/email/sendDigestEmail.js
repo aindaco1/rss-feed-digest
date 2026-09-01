@@ -1,3 +1,13 @@
+export function buildDigestIdempotencyKey(windowSlug) {
+  const normalizedSlug = String(windowSlug || "").trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedSlug)) {
+    throw new Error(`Invalid digest window slug: ${windowSlug}`);
+  }
+
+  return `daily-digest/${normalizedSlug}`;
+}
+
 export async function sendDigestEmail({ html, subject, idempotencyKey, env = process.env }) {
   const apiKey = env.RESEND_API_KEY;
   const from = env.DIGEST_FROM_EMAIL;

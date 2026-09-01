@@ -6,10 +6,9 @@ import { clusterArticles } from "../cluster/clusterArticles.js";
 import { embedArticles } from "../ai/embeddings.js";
 import { summarizeClusters } from "../ai/summarizeClusters.js";
 import { renderDigestEmail } from "../email/renderDigestEmail.js";
-import { sendDigestEmail } from "../email/sendDigestEmail.js";
+import { buildDigestIdempotencyKey, sendDigestEmail } from "../email/sendDigestEmail.js";
 import { parseArgs, hasFlag, hasNegativeFlag } from "../util/args.js";
 import { resolveDigestWindow } from "../util/dates.js";
-import { digestHash } from "../util/hash.js";
 
 const args = parseArgs();
 const config = loadConfig();
@@ -116,14 +115,7 @@ if (!dryRun) {
     process.exit(1);
   }
 
-  const idempotencyKey = `daily-digest/${window.slug}/${digestHash(
-    JSON.stringify({
-      from: process.env.DIGEST_FROM_EMAIL,
-      to: process.env.DIGEST_TO_EMAIL,
-      subject,
-      html
-    })
-  )}`;
+  const idempotencyKey = buildDigestIdempotencyKey(window.slug);
   const response = await sendDigestEmail({ html, subject, idempotencyKey });
   console.log(`Sent digest through Resend: ${response.id || JSON.stringify(response)}`);
 }

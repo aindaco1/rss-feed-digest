@@ -55,14 +55,9 @@ Datetimes without an offset are interpreted in `America/Denver`.
 
 ## GitHub Actions
 
-`.github/workflows/daily-digest.yml` is scheduled for 7:00 AM America/Denver every day and also supports manual dispatch for backfills and dry-runs. GitHub Actions cron is best-effort and can start later than the scheduled time; use an external scheduler if exact delivery time is a hard requirement.
+`.github/workflows/daily-digest.yml` is scheduled for 7:17 AM America/Denver every day and also supports manual dispatch for backfills and dry-runs. The off-hour minute avoids GitHub Actions' highest-load scheduling period, and the workflow's explicit timezone handles daylight-saving changes without duplicate UTC schedules. GitHub Actions cron is still best-effort and can start later than the scheduled time; use an external scheduler if exact delivery time is a hard requirement.
 
-GitHub Actions schedules are UTC-only, so the workflow has two cron triggers:
-
-- `13:00 UTC` for 7:00 AM during daylight time
-- `14:00 UTC` for 7:00 AM during standard time
-
-The first workflow step checks the current `America/Denver` UTC offset and skips the non-matching run, so only one email is sent each morning.
+Each digest window uses a stable Resend idempotency key. If a delayed scheduled run overlaps a manual recovery within Resend's 24-hour idempotency window, the second request cannot send a duplicate digest.
 
 Before enabling the scheduled send, add these under **Settings → Secrets and variables → Actions**.
 

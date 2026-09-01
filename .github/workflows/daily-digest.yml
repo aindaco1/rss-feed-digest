@@ -2,10 +2,10 @@ name: Daily Digest
 
 on:
   schedule:
-    # GitHub schedules run in UTC. These two entries cover 7:00 AM America/Denver
-    # in both daylight time (MDT, UTC-6) and standard time (MST, UTC-7).
-    - cron: "0 13 * * *"
-    - cron: "0 14 * * *"
+    # Avoid minute zero, when GitHub documents the highest scheduled-workflow load.
+    # The explicit timezone removes the need for duplicate DST-aware UTC schedules.
+    - cron: "17 7 * * *"
+      timezone: "America/Denver"
   workflow_dispatch:
     inputs:
       start:
@@ -103,20 +103,7 @@ jobs:
           should_run=true
           send=false
 
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            denver_offset="$(TZ=America/Denver date +%z)"
-            schedule="${{ github.event.schedule }}"
-
-            case "${schedule}:${denver_offset}" in
-              "0 13 * * *:-0600"|"0 14 * * *:-0700")
-                send=true
-                ;;
-              *)
-                should_run=false
-                echo "Skipping ${schedule}; current America/Denver offset is ${denver_offset}."
-                ;;
-            esac
-          elif [[ "${{ inputs.dry_run }}" != "true" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.dry_run }}" != "true" ]]; then
             send=true
           fi
 

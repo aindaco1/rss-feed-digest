@@ -80,6 +80,11 @@ test("keeps scheduled-workflow defaults aligned with the environment example", (
   assert.deepEqual(mismatches, []);
 });
 
+test("schedules the daily digest off minute zero in the Denver timezone", () => {
+  assert.match(workflow, /- cron: "17 7 \* \* \*"\s+timezone: "America\/Denver"/);
+  assert.doesNotMatch(workflow, /- cron: "0 /);
+});
+
 test("requires optional sync credentials only when their blocking mode is enabled", () => {
   const sendEnv = Object.fromEntries(REQUIRED_FOR_SEND.map((name) => [name, "set"]));
 
