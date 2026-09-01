@@ -98,7 +98,7 @@ Clustering first combines exact canonical URL matches, then optionally uses embe
 
 Feeds with `excludeSponsored: true` drop articles with explicit sponsored/affiliate disclosures in the RSS body. When `FETCH_SPONSORED_CHECKS` is not `false`, the digest also checks each opted-in article page so disclosures omitted from RSS summaries can still be filtered.
 
-To test the automation without sending, run the workflow manually and keep `dry_run` checked. The generated HTML and JSON are uploaded as the `digest-output` workflow artifact.
+To test the automation without sending, run the workflow manually and keep `dry_run` checked. The generated HTML and JSON are uploaded as the `digest-output` workflow artifact and retained for seven days.
 
 ## Feed Maintenance
 

@@ -257,3 +257,4 @@ jobs:
           name: digest-output
           path: out/
           if-no-files-found: ignore
+          retention-days: 7

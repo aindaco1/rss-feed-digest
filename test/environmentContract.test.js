@@ -85,6 +85,10 @@ test("schedules the daily digest off minute zero in the Denver timezone", () => 
   assert.doesNotMatch(workflow, /- cron: "0 /);
 });
 
+test("keeps digest artifacts only for the recent diagnostic window", () => {
+  assert.match(workflow, /retention-days: 7/);
+});
+
 test("requires optional sync credentials only when their blocking mode is enabled", () => {
   const sendEnv = Object.fromEntries(REQUIRED_FOR_SEND.map((name) => [name, "set"]));
 
