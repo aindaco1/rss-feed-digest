@@ -1,198 +1,45 @@
 # RSS Feed Digest
 
-Daily RSS digest generator for Alonso's feeds. It fetches Feedbin/Substack RSS feeds, dedupes and clusters overlapping articles, optionally uses OpenAI to merge clustered coverage, renders an HTML email, and sends it with Resend.
+Daily RSS digest generator for Alonso's feeds. It fetches Feedbin/Substack RSS feeds, deduplicates and clusters overlapping articles, optionally uses OpenAI to summarize coverage, and renders an HTML email for delivery through Resend. Optional subscription sync adds YouTube channels and Overcast podcasts.
 
-## Local Commands
+## Quick start
+
+Run commands from the repository root. The scheduled workflow uses Node.js 20.
 
 ```bash
-npm install
+npm ci
 npm run validate:feeds
 npm test
-npm run digest:test
 ```
 
-`npm run digest:test` uses the requested test window: 7:00 AM America/Denver on 2026-05-30 through 7:00 AM America/Denver on 2026-06-01.
-
-Generated files are written to `out/`:
-
-- `digest-YYYY-MM-DD.html`
-- `digest-YYYY-MM-DD.json`
-
-The JSON artifact records ordinary feed failures separately from disabled or unavailable generated feeds, along with article, cluster, and AI-call counts.
-
-## Sending
-
-Set these secrets locally or in GitHub Actions:
+Build a preview for the current digest window without sending email or calling OpenAI:
 
 ```bash
-OPENAI_API_KEY=...
-RESEND_API_KEY=...
-DIGEST_FROM_EMAIL="Alonso's Daily Digest <digest@example.com>"
-DIGEST_TO_EMAIL="alonso@example.com"
-FEEDBIN_EMAIL=...
-FEEDBIN_PASSWORD=...
-```
-
-Then run:
-
-```bash
-npm run check:env
-npm run digest:send
-```
-
-Dry-run is the default unless `--send` is provided or `SEND_DIGEST=true` is set.
-
-## Useful CLI Flags
-
-```bash
-node src/digest/runDigest.js --test-window --dry-run
-node src/digest/runDigest.js --start 2026-05-30T07:00:00 --end 2026-06-01T07:00:00 --dry-run
-node src/digest/runDigest.js --send
-node src/digest/runDigest.js --dry-run --no-ai --no-embeddings
-```
-
-Datetimes without an offset are interpreted in `America/Denver`.
-
-## GitHub Actions
-
-`.github/workflows/daily-digest.yml` is scheduled for 7:17 AM America/Denver every day and also supports manual dispatch for backfills and dry-runs. The off-hour minute avoids GitHub Actions' highest-load scheduling period, and the workflow's explicit timezone handles daylight-saving changes without duplicate UTC schedules. GitHub Actions cron is still best-effort and can start later than the scheduled time; use an external scheduler if exact delivery time is a hard requirement.
-
-Each digest window uses a stable Resend idempotency key. If a delayed scheduled run overlaps a manual recovery within Resend's 24-hour idempotency window, the second request cannot send a duplicate digest.
-
-Before enabling the scheduled send, add these under **Settings → Secrets and variables → Actions**.
-
-Required repository secrets:
-
-- `OPENAI_API_KEY`
-- `RESEND_API_KEY`
-- `DIGEST_FROM_EMAIL`
-- `DIGEST_TO_EMAIL`
-- `FEEDBIN_EMAIL`
-- `FEEDBIN_PASSWORD`
-
-Optional YouTube subscription sync secrets:
-
-- `YOUTUBE_CLIENT_ID`
-- `YOUTUBE_CLIENT_SECRET`
-- `YOUTUBE_REFRESH_TOKEN`
-
-Optional Overcast podcast sync secrets:
-
-- `OVERCAST_OPML_BASE64`
-- `OVERCAST_OPML`
-- `OVERCAST_OPML_GPG_PASSPHRASE`
-
-Optional repository variables and their defaults are maintained in `.env.example` under **Optional scheduled-workflow variables**. The test suite verifies that every variable in that shared contract is forwarded by `.github/workflows/daily-digest.yml`, so a documented tuning value cannot silently become a no-op in scheduled runs.
-
-The workflow defaults `FEED_CONCURRENCY` to `2`, `FEED_FETCH_ATTEMPTS` to `4`, and `FEED_FETCH_TIMEOUT_MS` to `30000` to accommodate large feeds and reduce transient failures from feeds that throttle GitHub-hosted runners.
-If Substack blocks `/feed` on GitHub runners, the fetcher falls back to the publication's public `/api/v1/archive` endpoint, then to Feedbin's cached entries for the matching subscription. `SUBSTACK_ARCHIVE_LIMIT` defaults to `30`; `FEEDBIN_PER_PAGE` defaults to `100`.
-Before send runs, the workflow runs `npm run feedbin:sync` so Feedbin has subscriptions for Substack feeds and JoBlo. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable that. `FEEDBIN_SYNC_EXTRA_TITLES` defaults to `Joblo` and can be a comma-separated list. Feedbin API requests retry transient network and server failures using `FEED_FETCH_ATTEMPTS` and `FEED_FETCH_TIMEOUT_MS`.
-If `OVERCAST_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run overcast:sync` before building the digest. This reads an Overcast OPML export from `OVERCAST_OPML_BASE64`, `OVERCAST_OPML`, `OVERCAST_OPML_PATH`, or an encrypted OPML file, writes an ignored `config/podcast-subscriptions.json`, and the digest loads those generated podcast feeds under the `Podcasts` topic by default. Set `OVERCAST_TOPIC` to route them to another topic, `OVERCAST_MAX_SUBSCRIPTIONS` to cap the number of synced podcasts, or `OVERCAST_MAX_EPISODES_PER_FEED` to a positive number to cap stored episode links from an Overcast all-data export. `OVERCAST_MAX_EPISODES_PER_FEED` defaults to `0`, which keeps all episode links. `OVERCAST_SKIP_UNAVAILABLE` defaults to `true` and drops OPML entries whose feed URL returns 404 or 410.
-If `YOUTUBE_SYNC_SUBSCRIPTIONS=true`, the workflow runs `npm run youtube:sync` before building the digest. This fetches the authenticated account's YouTube subscriptions, writes an ignored `config/youtube-subscriptions.json`, and the digest loads those generated channel feeds under the `YouTube` topic by default. Set `YOUTUBE_TOPIC` to route them to another topic, or `YOUTUBE_MAX_SUBSCRIPTIONS` to cap the number of synced channels. `YOUTUBE_SKIP_UNAVAILABLE` defaults to `true` and drops generated channel feeds whose RSS URL returns 404 or 410. YouTube Shorts are filtered out of the digest.
-YouTube sync is optional by default: if OAuth refresh fails, the workflow emits a warning and builds the digest without refreshed YouTube subscription feeds. Set `YOUTUBE_SYNC_REQUIRED=true` only if a YouTube sync failure should block the whole digest.
-The email renderer always moves the `YouTube`, `Podcasts`, and `Downloads` sections to the bottom of the email.
-Manual backfills and older dry-runs prefer Feedbin cached entries for feeds with `source: "feedbin"` when Feedbin credentials are configured. This avoids losing items from short rolling public feeds such as GetComics. `FEEDBIN_BACKFILL_AFTER_HOURS` defaults to `6`; set `FEEDBIN_PREFER_FOR_BACKFILLS=false` to force direct RSS fetches for historical windows.
-Scheduled sends fail before Resend if any feeds fail. Set `ALLOW_PARTIAL_DIGEST_SEND=true` only if you want to send incomplete digests.
-
-Clustering first combines exact canonical URL matches, then optionally uses embeddings for high-similarity cross-source articles. The fallback scorer builds a corpus-weighted content profile for each article in the digest run from the title, summary, article text, and nearby phrase pairs. Terms and phrases that are rarer in that day's candidate set carry more weight, while low-signal template words are suppressed. Articles merge only when the weighted semantic score is supported by shared signal terms or phrases. After the first pass, clusters are compared again so later bridge articles can still merge earlier related items; larger clusters require compatibility across the cluster so roundup posts do not bridge unrelated stories. `NO_BROAD_CLUSTER_TOPICS` defaults to `Downloads,Sports,Local` to avoid merging release-list feeds and recurring local/sports updates that often share generic titles, teams, places, years, or issue numbers without covering the same story.
-
-Feeds with `excludeSponsored: true` drop articles with explicit sponsored/affiliate disclosures in the RSS body. When `FETCH_SPONSORED_CHECKS` is not `false`, the digest also checks each opted-in article page so disclosures omitted from RSS summaries can still be filtered.
-
-To test the automation without sending, run the workflow manually and keep `dry_run` checked. The generated HTML and JSON are uploaded as the `digest-output` workflow artifact and retained for seven days.
-
-## Feed Maintenance
-
-```bash
-npm run audit:feeds
-```
-
-This performs a network check of each active feed and reports sources that are returning errors or HTML instead of RSS/Atom. Generated YouTube or podcast feeds returning 404/410 are reported as skipped under the same policy used by digest generation; failures from configured static feeds remain fatal.
-
-Feed entries in `config/feeds.json` support these optional maintenance fields:
-
-- `disabled`: keeps a feed documented while skipping digest generation, subscription sync, and feed audits.
-- `disabledReason`: records why a disabled feed is being skipped.
-- `feedbinSync`: opts a feed into the Feedbin subscription sync job.
-- `fallbackImageUrl`: supplies a default image when a feed item has none.
-- `preferFeedbinBackfill`: set to `false` to keep a `source: "feedbin"` feed on direct RSS fetches for manual backfills.
-- `titleIncludes`: keeps only items whose title contains the configured text.
-- YTS release titles are shortened for display by dropping source tags such as `[YTS.BZ]` and keeping useful release details.
-- `excludeCouponPosts`: drops recurring coupon-code and promo-code commerce posts while leaving normal reported stories alone.
-- `excludeSponsored`: drops explicit sponsored or affiliate posts, including page-level disclosures when sponsored checks are enabled.
-- `excludeSingleIssues`: drops GetComics-style single-issue posts with issue-number markers such as `#1`.
-
-## YouTube Subscriptions
-
-Do not use a YouTube username or password. YouTube subscriptions are synced through Google OAuth with the read-only `https://www.googleapis.com/auth/youtube.readonly` scope.
-
-One-time local setup:
-
-```bash
-export YOUTUBE_CLIENT_ID=...
-export YOUTUBE_CLIENT_SECRET=...
-npm run youtube:authorize
-```
-
-If the OAuth app is in Testing mode, add your Google account under Google Cloud Console → Google Auth Platform → Audience → Test users before opening the authorization URL.
-For a scheduled workflow, publish the OAuth app to Production when possible. Google refresh tokens for external OAuth apps in Testing status expire after seven days for non-basic scopes such as YouTube read access.
-
-Open the printed URL, approve access, then add the printed value as the `YOUTUBE_REFRESH_TOKEN` repository secret. Add `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` as repository secrets too, then set the repository variable `YOUTUBE_SYNC_SUBSCRIPTIONS=true`.
-If GitHub Actions reports `YouTube token refresh failed: Token has been expired or revoked.`, run `npm run youtube:authorize` again and replace the `YOUTUBE_REFRESH_TOKEN` repository secret with the new value.
-
-To test locally after authorization:
-
-```bash
-export YOUTUBE_REFRESH_TOKEN=...
-npm run youtube:sync
 npm run digest -- --dry-run --no-ai --no-embeddings
 ```
 
-The generated file is `config/youtube-subscriptions.json`; it is ignored by git.
+This fetches live feeds and writes HTML and JSON to `out/`. See [operations](docs/operations.md) for credentials, historical windows, output details, and sending.
 
-Podcast cards use the normal episode or article link from the feed. The digest does not render Overcast subscribe links or Overcast web links because Overcast only documents a subscribe-prompt URL scheme, not a reliable episode-open scheme. YouTube cards keep their normal web links unless `VIDEO_LITE_URL_TEMPLATE` is set. The template supports `{url}`, `{encodedUrl}`, and `{videoId}` placeholders, for example `someapp://open?url={encodedUrl}`. Video Lite does not publish a URL scheme in its public docs, so do not set this until you have a confirmed working scheme.
-
-## Overcast Podcasts
-
-Overcast podcast subscriptions are synced from an OPML export. The workflow does not store an Overcast username or password. A subscriptions-only OPML export is enough for feed syncing; all-data exports can still be used, but episode-level `overcastUrl` values are not rendered as special links unless a reliable episode-open app scheme becomes available.
-
-Export OPML from Overcast:
-
-1. Sign in at `https://overcast.fm/account`.
-2. Use the OPML subscriptions export for feed syncing, or the all-data export if you want to keep using the encrypted export workflow.
-3. Save the export as `overcast.opml`.
-
-Local test:
+For a sample layout with fixture content:
 
 ```bash
-export OVERCAST_OPML_PATH=/path/to/overcast.opml
-npm run overcast:sync
-npm run digest -- --dry-run --no-ai --no-embeddings
+npm run render:sample
 ```
 
-GitHub Actions setup:
+Open `out/sample-digest.html` to inspect the email layout.
 
-```bash
-base64 -i overcast.opml -o overcast.opml.b64
-gh secret set OVERCAST_OPML_BASE64 < overcast.opml.b64
-gh variable set OVERCAST_SYNC_SUBSCRIPTIONS --body true
-```
+## Documentation
 
-All-data OPML exports are often too large for GitHub's normal secret size limit. For large exports, encrypt the file and commit only the encrypted ciphertext:
+| Guide | Contents |
+| --- | --- |
+| [Operations](docs/operations.md) | Environment setup, CLI usage, sending, GitHub Actions, and recovery |
+| [Feeds](docs/feeds.md) | Feed configuration, audits, fallbacks, filtering, and clustering |
+| [Subscriptions](docs/subscriptions.md) | Feedbin sync, YouTube OAuth, Overcast OPML, and app links |
 
-```bash
-passphrase="$(openssl rand -base64 32)"
+[`.env.example`](.env.example) is the shared reference for supported environment variables and scheduled defaults. [The workflow](.github/workflows/daily-digest.yml) defines automation, and [the environment contract](src/config/environment.js) defines supported settings and credential requirements. Tests check that scheduled variables and defaults stay aligned.
 
-gpg --batch --yes --pinentry-mode loopback \
-  --passphrase "${passphrase}" \
-  --symmetric --cipher-algo AES256 \
-  --output config/overcast-all-data.opml.gpg \
-  /path/to/overcast-all-data.opml
+Keep detailed guides in `docs/` and link them here. Update the guide that owns a topic instead of copying its instructions into another document.
 
-gh secret set OVERCAST_OPML_GPG_PASSPHRASE --body "${passphrase}"
-gh variable set OVERCAST_SYNC_SUBSCRIPTIONS --body true
-git add config/overcast-all-data.opml.gpg
-```
+## License
 
-Do not commit the raw `.opml` or `.opml.b64` file. The workflow decrypts `config/overcast-all-data.opml.gpg` into the runner temp directory and sets `OVERCAST_OPML_PATH` before `npm run overcast:sync`. Set `OVERCAST_OPML_ENCRYPTED_PATH` only if you commit the encrypted file somewhere else.
-
-The generated file is `config/podcast-subscriptions.json`; it is ignored by git.
+[MIT](LICENSE).
