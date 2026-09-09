@@ -13,7 +13,7 @@
     "overcast:sync": "node src/feeds/syncOvercastSubscriptions.js",
     "youtube:authorize": "node src/feeds/authorizeYouTube.js",
     "youtube:sync": "node src/feeds/syncYouTubeSubscriptions.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "validate:feeds": "node src/feeds/validateFeeds.js",
     "render:sample": "node src/email/renderDigestEmail.js"
   },
@@ -22,6 +22,7 @@
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "openai": "^6.39.1",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "@dustwave/worker-core": "file:shared/dust-wave-platform/packages/worker-core"
   }
 }

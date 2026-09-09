@@ -66,3 +66,11 @@ For a manual preview or backfill, open **Actions → Daily Digest → Run workfl
 Before retrying a delayed or failed run, inspect its logs and output artifact. Local artifacts show what was generated; confirm the send result separately.
 
 The [email sender](../src/email/sendDigestEmail.js) uses `daily-digest/YYYY-MM-DD` as its Resend idempotency key, based on the window's end date. Different windows ending on the same date therefore share a key. Resend retains keys for 24 hours: an identical retry returns the earlier result, while a changed payload with the same key is rejected. After that retention period, a retry can send again. See [Resend's idempotency rules](https://resend.com/docs/dashboard/emails/idempotency-keys).
+
+## Email delivery defaults
+
+The sender uses Worker Core 0.13.0 at immutable Platform commit `af2a5e5e4b65f218e627652b8243feb9704c48a1`. Initialize submodules before `npm ci`; CI does the same. The shared helper adds `Auto-Submitted: auto-generated`. Optional `DIGEST_REPLY_TO_EMAIL` is forwarded from a GitHub repository variable; the authored sender and recipient secrets are unchanged.
+
+A plain-text alternative is derived from the same HTML using the existing HTML utility, preserving text and link destinations. The original HTML and subject are sent unchanged. Feed fetching, summaries, layout, send schedule and idempotency keys remain the same. Deploying source does not trigger a send. Do not retry an already attempted window with changed content under the same key, or manually resend beyond the provider's 24-hour deduplication period without checking history.
+
+Rollback the complete adoption commit and its submodule/lockfile together before the next scheduled run. See the [shared delivery guide](https://github.com/aindaco1/dust-wave-platform/blob/main/docs/email-deliverability.md). Tests use a mocked provider and do not send a live digest.

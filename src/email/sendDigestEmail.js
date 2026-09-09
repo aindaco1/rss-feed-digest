@@ -1,3 +1,6 @@
+import { prepareResendEmail } from "@dustwave/worker-core/email";
+import { htmlToText } from "../util/html.js";
+
 export function buildDigestIdempotencyKey(windowSlug) {
   const normalizedSlug = String(windowSlug || "").trim();
 
@@ -24,12 +27,13 @@ export async function sendDigestEmail({ html, subject, idempotencyKey, env = pro
       "Content-Type": "application/json",
       "Idempotency-Key": idempotencyKey
     },
-    body: JSON.stringify({
+    body: JSON.stringify(prepareResendEmail({
       from,
       to,
       subject,
-      html
-    })
+      html,
+      text: htmlToText(html, { email: true })
+    }, { replyTo: env.DIGEST_REPLY_TO_EMAIL }))
   });
 
   const body = await response.json().catch(() => ({}));

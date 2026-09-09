@@ -4,9 +4,10 @@ Daily RSS digest generator for Alonso's feeds. It fetches Feedbin/Substack RSS f
 
 ## Quick start
 
-Run commands from the repository root. The scheduled workflow uses Node.js 20.
+Run commands from the repository root. The scheduled workflow uses Node.js 22.
 
 ```bash
+git submodule update --init --recursive
 npm ci
 npm run validate:feeds
 npm test
