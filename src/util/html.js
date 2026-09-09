@@ -4,10 +4,23 @@ export function cleanWhitespace(value = "") {
   return String(value).replace(/\s+/g, " ").trim();
 }
 
-export function htmlToText(html = "") {
+export function htmlToText(html = "", { email = false } = {}) {
   if (!html) return "";
   const $ = cheerio.load(html);
   $("script, style, noscript, iframe, form").remove();
+  if (email) {
+    $("head").remove();
+    $("a[href]").each((_, element) => {
+      const link = $(element);
+      const href = link.attr("href");
+      const label = cleanWhitespace(link.text());
+      link.text(label && label !== href ? `${label} (${href})` : href);
+    });
+    $("br").replaceWith("\n");
+    $("p, div, h1, h2, h3, li, tr").prepend("\n").append("\n");
+    return $.root().text().split(/\n/).map(cleanWhitespace)
+      .join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
   return cleanWhitespace($.root().text());
 }
 

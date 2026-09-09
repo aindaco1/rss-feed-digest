@@ -21,6 +21,7 @@ export const OVERCAST_OPML_SOURCES = Object.freeze([
 
 // Repository variables that the scheduled workflow must forward to Node.
 export const WORKFLOW_VARIABLES = Object.freeze([
+  "DIGEST_REPLY_TO_EMAIL",
   "OPENAI_MODEL",
   "OPENAI_EMBEDDING_MODEL",
   "USE_EMBEDDINGS",
