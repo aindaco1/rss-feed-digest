@@ -49,4 +49,12 @@ Clustering first combines exact canonical URL matches, then optionally uses embe
 
 A second comparison pass lets later bridge articles merge earlier related clusters. Larger clusters require compatibility across the cluster so roundup posts do not connect unrelated stories.
 
+Embedding matches obey the same excluded-topic, standalone-video, and commerce/news boundaries. A vector match must meet the similarity threshold for every member of the candidate cluster; one highly similar roundup cannot connect unrelated stories. Embedding requests skip articles excluded from broad clustering and map responses by their explicit input index. Missing, invalid, or inconsistent vectors trigger the existing heuristic fallback.
+
 `NO_BROAD_CLUSTER_TOPICS` defaults to `Downloads,Sports,Local` to avoid merging release lists and recurring local or sports updates that share generic names or numbers without covering the same story. Clustering thresholds are listed in [`.env.example`](../.env.example); the implementation is in [`clusterArticles.js`](../src/cluster/clusterArticles.js).
+
+## Summary coverage
+
+AI summaries receive each normalized source's summary and body (normalization retains up to 6,000 body characters). The prompt asks for distinct material details, qualifications, attributed disagreements, and uncertainty. Requests over 64,000 UTF-8 payload bytes use the source-excerpt fallback instead of dropping sources. Empty, incomplete, malformed, or unknown-topic output also falls back, and `aiFailures` records those attempts in digest JSON.
+
+The fallback joins distinct source excerpts in recency order, removing exact repeats. Source names and links remain in the card's source section. Both synthesized summaries and fallback excerpts render in full; the renderer no longer clips them at 280 characters. Cards can consequently be taller. This preserves supplied text, but cannot recover details omitted by a feed or guarantee that AI synthesis captures every important fact. See [quality checks](testing.md).

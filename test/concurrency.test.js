@@ -16,3 +16,7 @@ test("does not call the mapper for an empty collection", async () => {
   assert.deepEqual(results, []);
   assert.equal(calls, 0);
 });
+
+test("positive fractional concurrency still processes every item", async () => {
+  assert.deepEqual(await mapLimit([1, 2], 0.5, async (n) => n * 2), [2, 4]);
+});

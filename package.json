@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check": "npm test && npm run validate:feeds && npm run test:jev",
+    "test:jev": "node scripts/jev-evaluation.js",
     "audit:feeds": "node src/feeds/auditFeeds.js",
     "check:env": "node src/config/checkEnvironment.js",
     "digest": "node src/digest/runDigest.js",
@@ -16,6 +18,9 @@
     "test": "node --test test/*.test.js",
     "validate:feeds": "node src/feeds/validateFeeds.js",
     "render:sample": "node src/email/renderDigestEmail.js"
+  },
+  "devDependencies": {
+    "@dustwave/test-core": "file:shared/dust-wave-platform/packages/test-core"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

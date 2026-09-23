@@ -215,70 +215,72 @@ export function clusterArticles(articles, options = {}) {
 }
 
 function clusterSettings(options) {
+  const env = options.env || process.env;
+  const setting = (value, name, fallback) => numberSetting(value, name, fallback, env);
   return {
-    threshold: numberSetting(options.threshold, "CLUSTER_THRESHOLD", 0.42),
-    embeddingThreshold: numberSetting(options.embeddingThreshold, "EMBEDDING_CLUSTER_THRESHOLD", 0.84),
-    crossSourceStrongSemanticThreshold: numberSetting(
+    threshold: setting(options.threshold, "CLUSTER_THRESHOLD", 0.42),
+    embeddingThreshold: setting(options.embeddingThreshold, "EMBEDDING_CLUSTER_THRESHOLD", 0.84),
+    crossSourceStrongSemanticThreshold: setting(
       options.crossSourceStrongSemanticThreshold,
       "CLUSTER_CROSS_SOURCE_STRONG_SEMANTIC_THRESHOLD",
       0.24
     ),
-    crossSourceSemanticThreshold: numberSetting(
+    crossSourceSemanticThreshold: setting(
       options.crossSourceSemanticThreshold,
       "CLUSTER_CROSS_SOURCE_SEMANTIC_THRESHOLD",
       0.075
     ),
-    crossSourcePhraseSemanticThreshold: numberSetting(
+    crossSourcePhraseSemanticThreshold: setting(
       options.crossSourcePhraseSemanticThreshold,
       "CLUSTER_CROSS_SOURCE_PHRASE_SEMANTIC_THRESHOLD",
       0.03
     ),
-    crossSourceSparseSemanticThreshold: numberSetting(
+    crossSourceSparseSemanticThreshold: setting(
       options.crossSourceSparseSemanticThreshold,
       "CLUSTER_CROSS_SOURCE_SPARSE_SEMANTIC_THRESHOLD",
       0.02
     ),
-    sameSourceStrongSemanticThreshold: numberSetting(
+    sameSourceStrongSemanticThreshold: setting(
       options.sameSourceStrongSemanticThreshold,
       "CLUSTER_SAME_SOURCE_STRONG_SEMANTIC_THRESHOLD",
       0.3
     ),
-    sameSourceSemanticThreshold: numberSetting(
+    sameSourceSemanticThreshold: setting(
       options.sameSourceSemanticThreshold,
       "CLUSTER_SAME_SOURCE_SEMANTIC_THRESHOLD",
       0.07
     ),
-    sameSourcePhraseSemanticThreshold: numberSetting(
+    sameSourcePhraseSemanticThreshold: setting(
       options.sameSourcePhraseSemanticThreshold,
       "CLUSTER_SAME_SOURCE_PHRASE_SEMANTIC_THRESHOLD",
       0.045
     ),
-    sameSourceLeadPhraseSemanticThreshold: numberSetting(
+    sameSourceLeadPhraseSemanticThreshold: setting(
       options.sameSourceLeadPhraseSemanticThreshold,
       "CLUSTER_SAME_SOURCE_LEAD_PHRASE_SEMANTIC_THRESHOLD",
       0.02
     ),
-    sameSourceSparseTermWindowMinutes: numberSetting(
+    sameSourceSparseTermWindowMinutes: setting(
       options.sameSourceSparseTermWindowMinutes,
       "CLUSTER_SAME_SOURCE_SPARSE_TERM_WINDOW_MINUTES",
       30
     ),
-    minSharedSignals: numberSetting(options.minSharedSignals, "CLUSTER_MIN_SHARED_SIGNALS", 2),
-    minSharedPhrases: numberSetting(options.minSharedPhrases, "CLUSTER_MIN_SHARED_PHRASES", 1),
-    minSharedStrongPhrases: numberSetting(options.minSharedStrongPhrases, "CLUSTER_MIN_SHARED_STRONG_PHRASES", 2),
+    minSharedSignals: setting(options.minSharedSignals, "CLUSTER_MIN_SHARED_SIGNALS", 2),
+    minSharedPhrases: setting(options.minSharedPhrases, "CLUSTER_MIN_SHARED_PHRASES", 1),
+    minSharedStrongPhrases: setting(options.minSharedStrongPhrases, "CLUSTER_MIN_SHARED_STRONG_PHRASES", 2),
     noBroadClusterTopics: topicSet(
       options.noBroadClusterTopics ||
-        process.env.NO_BROAD_CLUSTER_TOPICS ||
+        env.NO_BROAD_CLUSTER_TOPICS ||
         options.noCrossSourceClusterTopics ||
-        process.env.NO_CROSS_SOURCE_CLUSTER_TOPICS ||
+        env.NO_CROSS_SOURCE_CLUSTER_TOPICS ||
         "Downloads,Sports,Local"
     )
   };
 }
 
-function numberSetting(optionValue, envName, defaultValue) {
+function numberSetting(optionValue, envName, defaultValue, env) {
   if (optionValue !== undefined) return Number(optionValue);
-  if (process.env[envName] !== undefined) return Number(process.env[envName]);
+  if (env[envName] !== undefined) return Number(env[envName]);
   return defaultValue;
 }
 
@@ -287,11 +289,16 @@ function similarity(article, articleProfile, cluster, vectorsById, settings) {
   if (sameCanonical) return 1;
   if (isStandaloneArticle(article) || cluster.articles.some(isStandaloneArticle)) return 0;
 
+  if (isTopicExcluded(article.topicHint, settings.noBroadClusterTopics)) return 0;
+  if (cluster.articles.some((candidate) => isTopicExcluded(candidate.topicHint, settings.noBroadClusterTopics))) return 0;
+  if (cluster.profiles.some((candidateProfile) => candidateProfile.isCommerce !== articleProfile.isCommerce)) return 0;
+
   const sameSourceCluster = cluster.articles.every((candidate) => candidate.sourceName === article.sourceName);
 
   const vector = vectorsById.get(article.id);
   if (vector && !sameSourceCluster) {
-    const vectorScore = Math.max(
+    // Every member must agree; one roundup/bridge must not connect unrelated stories.
+    const vectorScore = Math.min(
       ...cluster.articles.map((candidate) => {
         const candidateVector = vectorsById.get(candidate.id);
         return candidateVector ? cosine(vector, candidateVector) : 0;
@@ -299,14 +306,6 @@ function similarity(article, articleProfile, cluster, vectorsById, settings) {
     );
 
     if (vectorScore >= settings.embeddingThreshold) return vectorScore;
-  }
-
-  if (isTopicExcluded(article.topicHint, settings.noBroadClusterTopics)) return 0;
-  if (cluster.articles.some((candidate) => isTopicExcluded(candidate.topicHint, settings.noBroadClusterTopics))) {
-    return 0;
-  }
-  if (cluster.profiles.some((candidateProfile) => candidateProfile.isCommerce !== articleProfile.isCommerce)) {
-    return 0;
   }
 
   const pairScores = cluster.profiles.map((candidateProfile, index) =>
@@ -733,6 +732,7 @@ function termSignals(signals) {
 }
 
 function cosine(a, b) {
+  if (a.length !== b.length || !a.length) return 0;
   let dot = 0;
   let aMag = 0;
   let bMag = 0;
@@ -783,4 +783,10 @@ function isTopicExcluded(topic, excludedTopics) {
 
 function isStandaloneArticle(article) {
   return article.sourceType === "youtube";
+}
+
+// The embedding producer uses the same eligibility policy as the consumer.
+export function isEmbeddingCandidate(article, options = {}) {
+  return !isStandaloneArticle(article) &&
+    !isTopicExcluded(article.topicHint, clusterSettings(options).noBroadClusterTopics);
 }

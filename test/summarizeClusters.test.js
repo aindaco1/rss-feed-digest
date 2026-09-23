@@ -93,3 +93,50 @@ function article(overrides) {
     imageUrl: null
   };
 }
+
+const coverageCluster = {
+  id: "coverage", topicHint: "Tech", latestPublishedAt: "2026-06-01T12:00:00.000Z",
+  articles: [
+    article({ id: "new", title: "Aster beta expands", sourceName: "A", summary: "Aster is expanding its beta." }),
+    article({ id: "old", title: "Aster beta restrictions", sourceName: "B", summary: "Only invited desktop users are eligible; mobile support is not confirmed." })
+  ]
+};
+
+test("fallback keeps unique details from every source and removes exact repeated excerpts", async () => {
+  const cluster = { ...coverageCluster, articles: [...coverageCluster.articles, coverageCluster.articles[0]] };
+  const digest = await summarizeClusters([cluster], { topics: ["Tech"] }, { env: {}, disableAI: true });
+  assert.match(digest.articles[0].summary, /Only invited desktop users/);
+  assert.equal(digest.articles[0].summary.split("Aster is expanding its beta.").length, 2);
+  assert.equal(digest.articles[0].sources.length, 3);
+});
+
+test("invalid and incomplete AI output cannot hide a story or replace its useful fallback", async () => {
+  for (const response of [
+    { output_text: '{"headline":"Hi","summary":"Body","topic":"Unknown"}' },
+    { output_text: '{"headline":"Hi","summary":"  ","topic":"Tech"}' },
+    { output_text: '{"headline":null,"summary":"Body","topic":"Tech"}' },
+    { status: "incomplete", output_text: '{"headline":"Hi","summary":"Body","topic":"Tech"}' },
+    { output_text: 'not JSON' }
+  ]) {
+    const client = { responses: { create: async () => response } };
+    const digest = await summarizeClusters([coverageCluster], { topics: ["Tech"] }, { env: {}, apiKey: "test", client });
+    assert.equal(digest.topics[0].articles.length, 1);
+    assert.match(digest.articles[0].summary, /Only invited desktop users/);
+    assert.equal(digest.aiFailures, 1);
+  }
+});
+
+test("summary input retains late source qualifications and instructs attribution of disagreements", async () => {
+  let request;
+  const cluster = { ...coverageCluster, articles: coverageCluster.articles.map(a => ({ ...a,
+    text: "Context. ".repeat(250) + "Registration is provisional until inspection."
+  })) };
+  await summarizeClusters([cluster], { topics: ["Tech"] }, { env: {}, apiKey: "test",
+    client: { responses: { create: async payload => {
+      request = payload;
+      return { status: "completed", output_text: '{"headline":"Beta","summary":"Invited users only.","topic":"Tech"}' };
+    } } }
+  });
+  assert.match(request.input[1].content, /Registration is provisional until inspection/);
+  assert.match(request.input[0].content, /disagree/i);
+});

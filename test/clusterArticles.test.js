@@ -28,6 +28,29 @@ test("clusters identical canonical URLs", () => {
   assert.equal(clusters[0].articles.length, 2);
 });
 
+test("embeddings obey topic and commerce boundaries", () => {
+  for (const topicHint of ["Downloads", "Sports", "Local"]) {
+    const rows = [article({ id: "a", title: "First edition", topicHint, sourceName: "A" }),
+      article({ id: "b", title: "Second edition", topicHint, sourceName: "B" })];
+    assert.equal(clusterArticles(rows, { vectorsById: new Map([["a", [1, 0]], ["b", [1, 0]]]) }).length, 2);
+  }
+  const rows = [article({ id: "a", title: "Aster desktop privacy update", sourceName: "A" }),
+    article({ id: "b", title: "Aster desktop sale discount", sourceName: "B" })];
+  assert.equal(clusterArticles(rows, { vectorsById: new Map([["a", [1, 0]], ["b", [1, 0]]]) }).length, 2);
+});
+
+test("an embedding bridge cannot join two incompatible stories", () => {
+  const rows = [
+    article({ id: "a", title: "Harbor renovation", sourceName: "A", publishedAt: "2026-06-01T13:00:00Z" }),
+    article({ id: "bridge", title: "Weekly roundup", sourceName: "B", publishedAt: "2026-06-01T12:00:00Z" }),
+    article({ id: "b", title: "Satellite deployment", sourceName: "C", publishedAt: "2026-06-01T11:00:00Z" })
+  ];
+  const vectorsById = new Map([["a", [1, 0]], ["bridge", [0.9, 0.43589]], ["b", [0.62, 0.7846]]]);
+  const clusters = clusterArticles(rows, { vectorsById });
+  assert.equal(clusters.length, 2);
+  assert.ok(clusters.every(c => !["a", "b"].every(id => c.articles.some(a => a.id === id))));
+});
+
 test("keeps unrelated stories separate", () => {
   const clusters = clusterArticles([
     article({ id: "a", title: "Apple announces new iPhone", summary: "A phone launch in California" }),
