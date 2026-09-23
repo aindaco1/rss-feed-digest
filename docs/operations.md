@@ -45,7 +45,7 @@ Provide both `--start` and `--end`, or neither. Datetimes without an offset use 
 Generated files are written to the ignored `out/` directory:
 
 - `digest-YYYY-MM-DD.html`: rendered email.
-- `digest-YYYY-MM-DD.json`: window, topics, article and cluster counts, AI-call count, ordinary feed failures, and separately recorded disabled or unavailable generated feeds.
+- `digest-YYYY-MM-DD.json`: window, topics, article and cluster counts, AI-call and AI-failure counts, ordinary feed failures, and separately recorded disabled or unavailable generated feeds. AI failures retain source excerpts rather than removing the story.
 
 The filename date comes from the window's end date. Running another window ending on that date overwrites the same local output files.
 
@@ -57,9 +57,34 @@ Send runs stop before contacting Resend when ordinary feed failures are present.
 
 Optional repository variables and their defaults live under **Optional scheduled-workflow variables** in [`.env.example`](../.env.example). The [contract tests](../test/environmentContract.test.js) verify that the workflow forwards every supported scheduled variable and uses the documented defaults.
 
-The workflow installs dependencies, runs tests, validates feed configuration, prepares enabled subscription sources, and builds the digest. Feedbin sync runs only before sends; enabled Overcast and YouTube sync also run for workflow dry-runs. See [subscriptions](subscriptions.md) for setup and the current YouTube required-sync limitation.
+The workflow installs dependencies, runs [offline quality checks](testing.md), prepares enabled subscription sources, and builds the digest. Feedbin sync runs only before sends; enabled Overcast and YouTube sync also run for workflow dry-runs. See [subscriptions](subscriptions.md) for setup and the current YouTube required-sync limitation.
 
 For a manual preview or backfill, open **Actions → Daily Digest → Run workflow** and keep `dry_run` checked. Supply both dates for a custom window, or select `test_window` for the fixed historical window. Unchecking `dry_run` requests a send. Generated HTML and JSON are uploaded as `digest-output` and retained for seven days when available, including after a send is blocked by feed failures.
+
+## Deployment and local upkeep
+
+Production runs from `main` through Daily Digest. Merge a reviewed change with its
+immutable Platform gitlink and lockfile, then verify the Test workflow on the
+merged revision. Test runs `npm run check` without credentials or inference.
+Dispatch Daily Digest on `main` with `dry_run=true` to verify hosted subscription
+reads, live feed ingestion, configured AI generation, and output artifacts.
+Record the exact commit and workflow result. A successful preview establishes
+generation, not Resend acceptance or delivered-email appearance. The next normal
+scheduled run uses the published revision; deployment itself does not send mail.
+
+Keep source, docs, synthetic fixtures, lockfiles, installed `node_modules`, the
+pinned Platform submodule, and local operator/subscription configuration for
+development. Keep representative successful and failed Jev evidence under
+ignored `out/jev/`, including provenance and reports needed to explain a failure.
+Superseded offline previews and temporary build output are reproducible and can
+be moved to local Trash after verification. Keep a compact cleanup/deployment
+receipt in ignored `out/release/`; do not commit credentials, real digest bodies,
+private subscription exports, or operational logs.
+
+Prune remote-tracking refs, then remove a task branch only after confirming its
+tip was merged and it is unused by any worktree. Check remote tips immediately
+before deletion so concurrent work is preserved. Retain `main` and any branch
+with unmerged work.
 
 ## Recovery and duplicate sends
 
@@ -69,8 +94,8 @@ The [email sender](../src/email/sendDigestEmail.js) uses `daily-digest/YYYY-MM-D
 
 ## Email delivery defaults
 
-The sender uses Worker Core 0.13.0 at immutable Platform commit `af2a5e5e4b65f218e627652b8243feb9704c48a1`. Initialize submodules before `npm ci`; CI does the same. The shared helper adds `Auto-Submitted: auto-generated`. Optional `DIGEST_REPLY_TO_EMAIL` is forwarded from a GitHub repository variable; the authored sender and recipient secrets are unchanged.
+The sender uses Worker Core 0.15.0 at immutable Platform commit `60d439b887f1244f82ff232c849d74152b28c776`. Initialize submodules before `npm ci`; CI does the same. The shared helper adds `Auto-Submitted: auto-generated`. Optional `DIGEST_REPLY_TO_EMAIL` is forwarded from a GitHub repository variable; the authored sender and recipient secrets are unchanged. [Testing](testing.md#platform-adoption) owns the current dependency adoption and rollback record.
 
-A plain-text alternative is derived from the same HTML using the existing HTML utility, preserving text and link destinations. The original HTML and subject are sent unchanged. Feed fetching, summaries, layout, send schedule and idempotency keys remain the same. Deploying source does not trigger a send. Do not retry an already attempted window with changed content under the same key, or manually resend beyond the provider's 24-hour deduplication period without checking history.
+A plain-text alternative is derived from the same HTML using the existing HTML utility, preserving text and link destinations. The sender forwards the rendered HTML and subject unchanged. Delivery settings, schedule and idempotency keys are independent of summary evaluation. Deploying source does not trigger a send. Do not retry an already attempted window with changed content under the same key, or manually resend beyond the provider's 24-hour deduplication period without checking history.
 
 Rollback the complete adoption commit and its submodule/lockfile together before the next scheduled run. See the [shared delivery guide](https://github.com/aindaco1/dust-wave-platform/blob/main/docs/email-deliverability.md). Tests use a mocked provider and do not send a live digest.

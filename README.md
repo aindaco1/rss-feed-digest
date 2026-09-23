@@ -11,6 +11,7 @@ git submodule update --init --recursive
 npm ci
 npm run validate:feeds
 npm test
+npm run check
 ```
 
 Build a preview for the current digest window without sending email or calling OpenAI:
@@ -36,6 +37,7 @@ Open `out/sample-digest.html` to inspect the email layout.
 | [Operations](docs/operations.md) | Environment setup, CLI usage, sending, GitHub Actions, and recovery |
 | [Feeds](docs/feeds.md) | Feed configuration, audits, fallbacks, filtering, and clustering |
 | [Subscriptions](docs/subscriptions.md) | Feedbin sync, YouTube OAuth, Overcast OPML, and app links |
+| [Testing and evaluation](docs/testing.md) | Offline quality checks, synthetic Jev evaluation, evidence, and Platform pin |
 
 [`.env.example`](.env.example) is the shared reference for supported environment variables and scheduled defaults. [The workflow](.github/workflows/daily-digest.yml) defines automation, and [the environment contract](src/config/environment.js) defines supported settings and credential requirements. Tests check that scheduled variables and defaults stay aligned.
 

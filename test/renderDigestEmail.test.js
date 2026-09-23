@@ -1,5 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { htmlToText } from "../src/util/html.js";
+
+test("retains qualifications beyond 280 characters in HTML and the email text alternative", () => {
+  const summary = "The program includes screenings, workshops, and discussions with participating filmmakers. ".repeat(4) +
+    "The workshop costs $25; the screening alone is free. Travel and accommodation are excluded.";
+  const html = renderDigestEmail({ dateLabel: "09/23/2026", topics: [{ name: "Film", articles: [{
+    headline: "Harbor program", summary, url: "https://example.test/program", sources: []
+  }] }] });
+  assert.ok(html.includes(summary));
+  assert.ok(htmlToText(html, { email: true }).includes(summary));
+});
 import { renderDigestEmail } from "../src/email/renderDigestEmail.js";
 
 test("renders digest header, topics, article metadata, and escaped text", () => {

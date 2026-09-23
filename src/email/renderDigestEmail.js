@@ -2,7 +2,6 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { isWebUrl } from "../util/urls.js";
 import { isDirectRun } from "../util/modules.js";
 
-const SUMMARY_LIMIT = 280;
 const CARD_ESTIMATE = {
   base: 42,
   image: 108,
@@ -27,7 +26,7 @@ const BOTTOM_TOPIC_ORDER = new Map([
 const styles = {
   page: "margin:0;padding:0;background:#0f0f0f;color:#f6f1e8;font-family:Arial,Helvetica,sans-serif;",
   shell: "width:100%;background:#0f0f0f;padding:22px 0;",
-  container: "width:100%;max-width:760px;margin:0 auto;background:#171717;border:1px solid #2a2a2a;",
+  container: "box-sizing:border-box;width:100%;max-width:760px;margin:0 auto;background:#171717;border:1px solid #2a2a2a;",
   header: "padding:28px 28px 22px;border-bottom:1px solid #383838;",
   eyebrow: "margin:0 0 8px;color:#a9a197;font-size:11px;line-height:1.35;text-transform:uppercase;letter-spacing:1.6px;font-weight:700;",
   h1: "margin:0;color:#fff;font-size:36px;line-height:0.98;font-weight:900;letter-spacing:0;",
@@ -131,11 +130,7 @@ function renderArticle(article) {
 }
 
 function compactSummary(value = "") {
-  const summary = String(value).replace(/\s+/g, " ").trim();
-  if (summary.length <= SUMMARY_LIMIT) return summary;
-
-  const truncated = summary.slice(0, SUMMARY_LIMIT - 1).replace(/\s+\S*$/, "");
-  return `${truncated}...`;
+  return String(value).replace(/\s+/g, " ").trim();
 }
 
 function estimatedLineCount(value, charsPerLine, minLines = 0) {

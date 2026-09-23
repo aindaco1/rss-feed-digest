@@ -11,7 +11,7 @@ export async function mapLimit(items, limit, mapper) {
   }
 
   const parsedLimit = Number(limit);
-  const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.floor(parsedLimit) : 1;
+  const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.max(1, Math.floor(parsedLimit)) : 1;
   const workerCount = Math.min(safeLimit, items.length);
   await Promise.all(Array.from({ length: workerCount }, worker));
   return results;

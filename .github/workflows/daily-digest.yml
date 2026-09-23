@@ -130,13 +130,9 @@ jobs:
         if: steps.mode.outputs.should_run == 'true'
         run: npm ci
 
-      - name: Run tests
+      - name: Run offline quality checks
         if: steps.mode.outputs.should_run == 'true'
-        run: npm test
-
-      - name: Validate feed config
-        if: steps.mode.outputs.should_run == 'true'
-        run: npm run validate:feeds
+        run: npm run check
 
       - name: Decrypt Overcast all-data OPML
         if: steps.mode.outputs.should_run == 'true' && env.OVERCAST_SYNC_SUBSCRIPTIONS == 'true'
