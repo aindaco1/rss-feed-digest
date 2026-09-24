@@ -167,3 +167,20 @@ completed and pending Cloudflare envelopes. The full offline suite passes 116
 tests. Credential acquisition still uses an explicit external setup; the runner
 does not discover credentials in sibling projects. Live availability and this
 small synthetic pass do not establish general summary accuracy or release acceptance.
+
+### Hosted deployment verification
+
+[PR #4](https://github.com/aindaco1/rss-feed-digest/pull/4) deployed these changes
+at `99aed1830caa0cdc96893c9f34d9b6a7ad4627af` on `main`.
+The [merged-revision Test run](https://github.com/aindaco1/rss-feed-digest/actions/runs/35936042309)
+passed all 116 tests, feed validation, and the offline Jev preview.
+The [Daily Digest dry run](https://github.com/aindaco1/rss-feed-digest/actions/runs/35936058550)
+completed subscription preparation and live generation: 307 articles, 236 cards
+across 13 topics, 37 AI summary calls, zero AI fallbacks, zero feed failures, and
+one separately recorded skipped feed.
+
+Artifact checks confirmed all 307 source links, unique/nonempty cards, and every
+complete summary in both HTML and derived email text. These are coverage and
+rendering checks; the live summaries were not semantically graded by Jev. No
+email was sent. The next normal scheduled run uses the published code, with
+provider delivery and received-email appearance still separate checks.
