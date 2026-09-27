@@ -3,9 +3,10 @@ import { mapLimit } from "../util/concurrency.js";
 import { appLinkForArticle } from "../util/appLinks.js";
 
 export const MAX_SUMMARY_WORDS = 100;
+export const DEFAULT_SUMMARY_MODEL = "gpt-5.4-mini";
 function summaryStyle(maxWords) {
   const length = maxWords < MAX_SUMMARY_WORDS ? "one short sentence" : "one paragraph of 2-4 concise sentences";
-  return `Write a factual synthesis, not the opening passage copied from an article. Use ${length} and at most ${maxWords} words. Prioritize the main development and essential qualifications; do not try to list every detail. Do not fill gaps from background knowledge. Preserve the type of event: a review or sale does not establish a new product launch. Exclude jokes, hyperbole and figurative comparisons; never present them as literal claims. Do not add unsupported product qualities, advice, generic conclusions or closing commentary. Do not use lists or line breaks.`;
+  return `Write a factual synthesis, not the opening passage copied from an article. Use ${length} and at most ${maxWords} words. Prioritize the main development and essential qualifications; do not try to list every detail. Do not fill gaps from background knowledge. Preserve the type of event: a review or sale does not establish a new product launch. Exclude jokes, hyperbole and figurative comparisons; never present them as literal claims. Do not add unsupported product qualities, advice, generic conclusions or closing commentary. State the supported news directly; omit comments about source completeness or these summarization rules. Do not use lists or line breaks.`;
 }
 
 function summaryWordLimit(cluster) {
@@ -20,7 +21,7 @@ export async function summarizeClusters(clusters, config, options = {}) {
   const env = options.env || process.env;
   const topicOrder = config.topics;
   const useAI = Boolean(options.apiKey) && !options.disableAI;
-  const model = options.model || env.OPENAI_MODEL || "gpt-4.1-mini";
+  const model = options.model || env.OPENAI_MODEL || DEFAULT_SUMMARY_MODEL;
   // Zero means the whole edition. An explicit positive limit remains available.
   const aiMaxClusters = Number(env.AI_MAX_CLUSTERS || 0);
   if (!Number.isSafeInteger(aiMaxClusters) || aiMaxClusters < 0) throw new RangeError("Invalid AI_MAX_CLUSTERS");

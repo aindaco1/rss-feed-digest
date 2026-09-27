@@ -19,7 +19,7 @@ export function prepareBudget(cases, generate = false) {
     row.candidate, row.requirements, { reference: row.reference }).input.questions).length, 0);
   // Vendor reference rates checked 2026-09-23, not provider-enforced billing caps.
   const reservedEstimateUsd = questionCount * 32_000 * 0.042 / 1e6 +
-    (generate ? MAX_SUMMARIES * (MAX_SUMMARY_BYTES * 0.40 + MAX_OUTPUT_TOKENS * 1.60) / 1e6 : 0);
+    (generate ? MAX_SUMMARIES * (MAX_SUMMARY_BYTES * 0.75 + MAX_OUTPUT_TOKENS * 4.50) / 1e6 : 0);
   if (questionCount > MAX_QUESTIONS || reservedEstimateUsd > 0.15) throw new Error("Pilot exceeds budget");
   return { questionCount, maxJevRequests: cases.length, maxSummaryRequests: generate ? MAX_SUMMARIES : 0,
     reservedEstimateUsd, estimatedLimitUsd: 0.15, isBillingCap: false };

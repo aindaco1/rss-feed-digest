@@ -73,7 +73,7 @@ jobs:
     timeout-minutes: 35
     env:
       DIGEST_REPLY_TO_EMAIL: ${{ vars.DIGEST_REPLY_TO_EMAIL || '' }}
-      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-mini' }}
       OPENAI_EMBEDDING_MODEL: ${{ vars.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
       AI_MAX_CLUSTERS: ${{ vars.AI_MAX_CLUSTERS || '0' }}
       AI_SUMMARIZE_SINGLE_ARTICLES: ${{ vars.AI_SUMMARIZE_SINGLE_ARTICLES || 'true' }}

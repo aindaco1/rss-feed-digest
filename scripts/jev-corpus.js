@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import * as cheerio from "cheerio/slim";
 import { clusterArticles, isEmbeddingCandidate } from "../src/cluster/clusterArticles.js";
-import { MAX_SUMMARY_WORDS, summarizeClusters } from "../src/ai/summarizeClusters.js";
+import { DEFAULT_SUMMARY_MODEL, MAX_SUMMARY_WORDS, summarizeClusters } from "../src/ai/summarizeClusters.js";
 import { renderDigestEmail } from "../src/email/renderDigestEmail.js";
 import { cleanWhitespace, htmlToText } from "../src/util/html.js";
 
@@ -49,7 +49,7 @@ export async function captureCorpus({ client, vectorsById } = {}) {
   const started = performance.now();
   const clusters = clusterArticles(articles, { vectorsById, env: {} });
   const digest = await summarizeClusters(clusters, config, {
-    env: { AI_CONCURRENCY: "1", AI_MAX_CLUSTERS: "3", AI_SUMMARIZE_SINGLE_ARTICLES: "false" }, model: "gpt-4.1-mini",
+    env: { AI_CONCURRENCY: "1", AI_MAX_CLUSTERS: "3", AI_SUMMARIZE_SINGLE_ARTICLES: "false" }, model: DEFAULT_SUMMARY_MODEL,
     retry: false, apiKey: "injected-test-client",
     client: client || { responses: { create: async payload => sourceCompositeResponse(payload) } }
   });
@@ -63,6 +63,11 @@ export async function captureCorpus({ client, vectorsById } = {}) {
   cases.push(...["pass", "fail"].map(expected => ({ id: `control-injection-${expected}`, expected,
     candidate: expected === "pass" ? "The free-laptop ticket promotion is false." : "Every premiere ticket includes a free laptop.",
     reference: JSON.stringify(injection.sources), requirements: { injection: injection.requirements.injection } })));
+  cases.push(...fixture.summaryControls.flatMap(control => ["pass", "fail"].map(expected => ({
+    id: `control-summary-${control.id}-${expected}`, expected,
+    candidate: control[expected === "pass" ? "good" : "bad"], reference: control.reference,
+    requirements: { fidelity: control.requirement }
+  }))));
   for (const story of fixture.stories) {
     const item = digest.articles.find(a => a.sources.some(s => s.url === `https://example.test/${story.id}-0`));
     if (!item) continue; // The exact check records missing coverage, never a silent pass.

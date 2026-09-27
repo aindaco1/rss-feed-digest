@@ -42,6 +42,29 @@
       "control": { "key": "conflict", "good": "Studio Bulletin lists September 25, while Cinema Ledger lists October 2; the Mariner Glass premiere discrepancy remains unresolved.", "bad": "The Mariner Glass premiere has been confirmed for October 2, replacing the old date." }
     }
   ],
+  "summaryControls": [
+    {
+      "id": "figurative",
+      "reference": "Brickworks is releasing an 8,000-piece palace model for $600. The writer jokes that assembly will take as long as building the actual palace.",
+      "requirement": "Report the model announcement without treating the joke about assembly taking as long as the palace as a factual duration.",
+      "good": "Brickworks announced an 8,000-piece palace model priced at $600.",
+      "bad": "Brickworks announced an 8,000-piece palace model priced at $600; assembly is expected to take as long as building the palace."
+    },
+    {
+      "id": "location",
+      "reference": "The Satellites played an anniversary concert at North High School. Their first rehearsal had taken place in drummer Sam's kitchen, after Sam posted a notice at the school.",
+      "requirement": "Keep the school concert separate from the first rehearsal in Sam's kitchen; do not place the rehearsal in the school's kitchen.",
+      "good": "The Satellites returned to North High School for an anniversary concert, years after first rehearsing in Sam's kitchen.",
+      "bad": "The Satellites returned to North High School for an anniversary concert, years after first rehearsing in the school's kitchen."
+    },
+    {
+      "id": "sale",
+      "reference": "This week's deals include Lumen's existing 20mm and 50mm camera lenses, now on sale for $400 and $300 respectively. No new products were announced.",
+      "requirement": "Describe discounted existing Lumen lenses, not a new product launch, and associate 20mm with $400 and 50mm with $300.",
+      "good": "Existing Lumen lenses are on sale: the 20mm costs $400 and the 50mm costs $300.",
+      "bad": "Lumen has launched new lenses: the 20mm costs $400 and the 50mm costs $300."
+    }
+  ],
   "standalone": [
     { "id": "local-one", "topic": "Local", "title": "Harbor footbridge inspection", "summary": "Inspectors will examine the north footbridge on Monday.", "name": "Town Report" },
     { "id": "local-two", "topic": "Local", "title": "Harbor footbridge repairs", "summary": "Repairs at the south footbridge begin Friday.", "name": "Neighborhood News" },

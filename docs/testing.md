@@ -43,7 +43,7 @@ expected to become six cards. Cases cover screening/workshop fees and exclusions
 a limited software beta, conflicting premiere dates, quoted prompt injection,
 separate local updates, and a standalone video. Evaluation fixes clustering
 settings to product defaults and summarization to the current default
-`gpt-4.1-mini`, independent of ambient model/concurrency settings.
+`gpt-5.4-mini`, independent of ambient model/concurrency settings.
 
 Exact checks require the expected article partition, topic/card conservation,
 every source URL, and complete summaries in rendered HTML and the derived email
@@ -52,7 +52,11 @@ omissions, grounding, qualifications, attributed disagreements, and injection
 resistance, scoped to each headline/summary and its rendered counterpart.
 Source-link titles cannot earn credit for summary omissions.
 
-Eight labeled positive/negative controls check the judge. Labels are not sent in
+Fourteen labeled positive/negative controls check the judge, including figurative
+language, correct locations and sales versus product launches. Frozen offline
+simulators confirm that a shared-vocabulary shortcut produces exactly three false
+passes on the new minimal pairs, while a faithful simulator produces none. These
+simulations validate the controls, not Jev's accuracy. Labels are not sent in
 model inputs. These are engineering-authored regressions, not independent human
 calibration or an unseen holdout. The 0.10 probability margin is provisional;
 unknown returned models, uncertainty and near ties require review. Current
@@ -61,7 +65,7 @@ version pin. Never change a label or threshold merely to turn failures green.
 
 ## Bounds and evidence
 
-The prepared corpus has 14 Jev requests / 26 questions. Hard limits are 40
+The prepared corpus has 20 Jev requests / 32 questions. Hard limits are 40
 questions, 32,000 UTF-8 bytes per Jev request, and three optional summary requests
 of at most 10,000 serialized bytes / 1,000 output tokens. Calls run sequentially
 with a 45-second timeout and no automatic retries, fallback provider, or resume.
@@ -69,12 +73,12 @@ The full corpus and summary request shapes are preflighted before authentication
 Generation validation errors stop further transport even though the product
 summarizer normally falls back. An interrupted pending call may have been billed.
 
-The estimated reservation is $0.034944 for source-composite evaluation or $0.051744 with
+The estimated reservation is $0.043008 for source-composite evaluation or $0.079008 with
 fresh summaries, below the runner's fixed $0.15 estimate limit. This uses a
 conservative 32,000 input tokens per Jev question, with reference rates checked
-September 23, 2026: [Jev](https://typesafe.ai/) $0.042/million input tokens and
-[GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
-$0.40/$1.60 per million input/output tokens. Estimates are not billing caps or
+September 23, 2026: [Jev](https://typesafe.ai/) $0.042/million input tokens, and
+September 27, 2026: [GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
+$0.75/$4.50 per million input/output tokens. Estimates are not billing caps or
 receipts; provider/account pricing and fees remain authoritative.
 
 Each run creates a unique ignored `out/jev/<timestamp>-<UUID>/` directory with
@@ -194,7 +198,7 @@ paragraph of at most 100 words. After one retry fails, a card keeps only its
 headline and source links. The earlier September 23 records above describe the
 previous excerpt fallback; they do not validate this policy.
 
-Local verification passes 127 tests, feed validation and the offline Jev
+Local verification passes 128 tests, feed validation and the offline Jev
 preview. New cases cover editions beyond 80 cards, explicit limits, invalid
 limits, oversized inputs, retry success/failure, paragraph/word limits,
 headline-only rendering, short-teaser limits, Atom inline text order and unrelated story matches.
@@ -225,3 +229,18 @@ in `comparison_articles`. This skips the digest job and uses only the OpenAI
 credential; it cannot send mail. The `summary-comparison` artifact contains the
 inputs, generated cards, rendered HTML, calls/retries, timing, reported usage and
 estimated token cost. Comparison does not change the production model setting.
+
+The [September 27 comparison](https://github.com/aindaco1/rss-feed-digest/actions/runs/36359836400)
+generated 32 summaries from eight public article snapshots, twice per model,
+without retries or failures. GPT-4.1 mini presented the Lego assembly-time joke
+as fact in both rounds; GPT-5.4 mini omitted it in both. Both models kept the
+lens sale prices, and the stronger model produced shorter teaser summaries.
+Manual review favored GPT-5.4 mini; the user approved the switch. Token estimates
+were $0.0100104 for GPT-4.1 mini and $0.0181743 for GPT-5.4 mini. These include
+reported cache hits, are not billing receipts, and are not a whole-edition cost
+forecast. The small, selected sample is not a calibrated accuracy benchmark.
+
+The new Jev fidelity controls have passed offline simulation only. Live grading
+is pending refreshed Cloudflare credentials and a selected account. Jev remains
+advisory: it neither writes summaries nor changes runtime acceptance. Its shared
+Platform adapter and dependency pin are unchanged.
