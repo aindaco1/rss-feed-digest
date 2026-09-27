@@ -65,7 +65,7 @@ const STOP_WORDS = new Set([
 ]);
 
 const LOW_SIGNAL_TERMS = new Set([
-  "album", "already", "film", "first", "got", "great", "hear", "music",
+  "album", "already", "biggest", "ever", "exclusive", "film", "first", "got", "great", "hear", "music",
   "old", "one", "release", "says", "share", "song", "thing", "time", "went",
   "1hr",
   "allegedly",
@@ -167,6 +167,9 @@ const LOW_SIGNAL_TERMS = new Set([
 // Compare stop signals in the same normalized form as article tokens (movies,
 // releases, etc.), so inflections cannot turn template language into anchors.
 const LOW_SIGNAL_TOKENS = new Set([...LOW_SIGNAL_TERMS].map(normalizeToken));
+// Event verbs can support a phrase such as "Wolverine reveal", but cannot
+// independently justify merging articles merely published close together.
+const EVENT_VERBS = new Set(["reveal", "unveil"]);
 
 const FIELD_WEIGHTS = {
   titleTerm: 4,
@@ -354,7 +357,8 @@ function pairEvidence(a, b) {
     sharedLeadSignals: sharedTerms(a.leadSignals, b.leadSignals).size,
     sharedTitlePhraseSignals: intersectionSize(a.titlePhraseSignals, b.titlePhraseSignals),
     sharedTitleLeadSignals:
-      union(sharedTerms(a.titleSignals, b.leadSignals), sharedTerms(a.leadSignals, b.titleSignals)).size,
+      [...union(sharedTerms(a.titleSignals, b.leadSignals), sharedTerms(a.leadSignals, b.titleSignals))]
+        .filter((feature) => !EVENT_VERBS.has(feature.slice(2))).length,
     sharedTitleLeadPhraseSignals:
       intersectionSize(a.titlePhraseSignals, b.leadPhraseSignals) +
       intersectionSize(a.leadPhraseSignals, b.titlePhraseSignals)

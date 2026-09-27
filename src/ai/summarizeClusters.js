@@ -3,7 +3,7 @@ import { mapLimit } from "../util/concurrency.js";
 import { appLinkForArticle } from "../util/appLinks.js";
 
 export const MAX_SUMMARY_WORDS = 100;
-const SUMMARY_STYLE = `Write a factual synthesis, not the opening passage copied from an article. Use one paragraph of 2-4 concise sentences and at most ${MAX_SUMMARY_WORDS} words. Prioritize the main development and essential qualifications; do not try to list every detail. Sparse sources may need fewer sentences. Do not use lists or line breaks.`;
+const SUMMARY_STYLE = `Write a factual synthesis, not the opening passage copied from an article. Use one paragraph of 2-4 concise sentences and at most ${MAX_SUMMARY_WORDS} words. Prioritize the main development and essential qualifications; do not try to list every detail. When only a headline or teaser is supplied, use one short sentence without filling gaps from background knowledge. Preserve the type of event: a review or sale does not establish a new product launch. Do not add unsupported product qualities, advice, generic conclusions or closing commentary. Do not use lists or line breaks.`;
 
 export async function summarizeClusters(clusters, config, options = {}) {
   const env = options.env || process.env;

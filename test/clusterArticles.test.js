@@ -736,6 +736,14 @@ test("generic wording cannot combine unrelated stories in a busy edition", () =>
     [
       { title: "Administration risks freeing convicted criminals in international court dispute", sourceName: "Politics Wire", summary: "A scholar argued that the Trump administration risks weakening the International Criminal Court and freeing defendants." },
       { title: "Appeals Court Lets Pentagon Designate Anthropic a Supply-Chain Risk", sourceName: "Tech Wire", summary: "The AI lab had argued multiple violations of its rights, but a divided panel of judges sided with the Trump administration." }
+    ],
+    [
+      { title: "Gaming’s biggest horror series are more vital than ever", sourceName: "Games Wire", summary: "Survival horror franchises return with a reboot and a new game." },
+      { title: "Lego’s biggest set ever is coming out soon", sourceName: "Culture Wire", summary: "The Sagrada Familia model has 12,060 pieces and costs $800." }
+    ],
+    [
+      { title: "Brandon Sanderson’s New Cosmere Book Gets Exclusive New Reveal", summary: "A reveal of Brandon Sanderson's next fantasy book explores new worlds and magic." },
+      { title: "Magic: The Gathering Designer Reveals the Unexpected Inspiration Behind Reality Fracture", summary: "The new Magic set introduces alternate versions of popular characters. Its designer reveals his inspiration." }
     ]
   ];
   const context = Array.from({ length: 25 }, (_, i) => article({ id: `background-${i}`, title: `Unconnected bulletin ${i}`, topicHint: "Local" }));
