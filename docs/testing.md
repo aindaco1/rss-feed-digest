@@ -194,10 +194,10 @@ paragraph of at most 100 words. After one retry fails, a card keeps only its
 headline and source links. The earlier September 23 records above describe the
 previous excerpt fallback; they do not validate this policy.
 
-Local verification passes 126 tests, feed validation and the offline Jev
+Local verification passes 127 tests, feed validation and the offline Jev
 preview. New cases cover editions beyond 80 cards, explicit limits, invalid
 limits, oversized inputs, retry success/failure, paragraph/word limits,
-headline-only rendering, Atom inline text order and unrelated story matches.
+headline-only rendering, short-teaser limits, Atom inline text order and unrelated story matches.
 The existing positive roundup and event-clustering cases still pass.
 
 A heuristic replay of 67 articles from six saved public feed snapshots for the
@@ -208,3 +208,20 @@ publisher summary and inline text order are preserved. The snapshots are ignored
 local evidence, not committed fixtures. They were re-fetched after the scheduled
 run; original production inputs and embeddings were not retained. This replay
 does not establish fresh AI quality or email-client acceptance.
+
+### Bounded comparison of summary models
+
+`node scripts/compare-summaries.js --input=/path/to/cases.json` validates and
+saves a zero-network preview. Add `--live` with process `OPENAI_API_KEY` to compare
+GPT-4.1 mini with GPT-5.4 mini using the production summarizer and renderer.
+The input is 1–8 cases (`id`, `review`, `articles`), each containing 1–3 normalized
+public articles. Keep source snapshots in ignored `out/`, not tracked fixtures.
+The complete input is limited to 48 KB. Two rounds per model permit at most
+64 requests including the product's one retry. Model outputs remain subject to
+manual semantic review; a completed run is not an accuracy pass.
+
+For hosted use, dispatch Daily Digest with `compare_summaries=true` and the JSON
+in `comparison_articles`. This skips the digest job and uses only the OpenAI
+credential; it cannot send mail. The `summary-comparison` artifact contains the
+inputs, generated cards, rendered HTML, calls/retries, timing, reported usage and
+estimated token cost. Comparison does not change the production model setting.
