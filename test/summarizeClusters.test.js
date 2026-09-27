@@ -199,7 +199,7 @@ test("retries rejected summaries once and uses the complete corrected response",
     env: {}, apiKey: "test", client: { responses: { create: async (request, settings) => {
       assert.equal(settings.maxRetries, 0);
       assert.equal(settings.timeout, 45_000);
-      assert.match(request.input[0].content, /at most 100 words/);
+      assert.match(request.input[0].content, /at most 35 words/);
       calls++;
       return calls === 1 ? response(Array(101).fill("word").join(" ")) : response();
     } } }
@@ -230,4 +230,20 @@ test("oversized input preserves source links without attempting inference", asyn
   assert.equal(digest.aiFailures, 1);
   assert.equal(digest.articles[0].summary, "");
   assert.equal(digest.articles[0].sources.length, 2);
+});
+
+test("short teasers get a stricter word limit without restricting full article bodies", async () => {
+  const small = singleClusters(1)[0];
+  const full = { ...small, id: "full", articles: small.articles.map(a => ({ ...a, text: "Available source detail. ".repeat(40) })) };
+  const budgets = [];
+  const digest = await summarizeClusters([small, full], { topics: ["Tech"] }, {
+    env: { AI_CONCURRENCY: "1" }, apiKey: "test", retry: false,
+    client: { responses: { create: async request => {
+      budgets.push(request.input[0].content.match(/at most (\d+) words/)[1]);
+      return response(Array(36).fill("word").join(" "));
+    } } }
+  });
+  assert.deepEqual(budgets, ["35", "100"]);
+  assert.equal(digest.articles[0].summary, "");
+  assert.equal(digest.articles[1].summary.split(" ").length, 36);
 });
