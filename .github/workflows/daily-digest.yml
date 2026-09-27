@@ -42,8 +42,8 @@ jobs:
       DIGEST_REPLY_TO_EMAIL: ${{ vars.DIGEST_REPLY_TO_EMAIL || '' }}
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
       OPENAI_EMBEDDING_MODEL: ${{ vars.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
-      AI_MAX_CLUSTERS: ${{ vars.AI_MAX_CLUSTERS || '80' }}
-      AI_SUMMARIZE_SINGLE_ARTICLES: ${{ vars.AI_SUMMARIZE_SINGLE_ARTICLES || 'false' }}
+      AI_MAX_CLUSTERS: ${{ vars.AI_MAX_CLUSTERS || '0' }}
+      AI_SUMMARIZE_SINGLE_ARTICLES: ${{ vars.AI_SUMMARIZE_SINGLE_ARTICLES || 'true' }}
       AI_CONCURRENCY: ${{ vars.AI_CONCURRENCY || '2' }}
       FEED_CONCURRENCY: ${{ vars.FEED_CONCURRENCY || '2' }}
       FEED_FETCH_ATTEMPTS: ${{ vars.FEED_FETCH_ATTEMPTS || '4' }}

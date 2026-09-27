@@ -123,7 +123,7 @@ function renderArticle(article) {
           ${articleUrl ? `<a href="${escapeHtml(articleUrl)}" style="${styles.link}">${escapeHtml(article.headline)}</a>` : escapeHtml(article.headline)}
         </h2>
         ${article.appUrl ? `<p style="${styles.appLinkLine}"><a href="${escapeHtml(article.appUrl)}" style="${styles.link}">${escapeHtml(article.appLabel || "Open in app")}</a></p>` : ""}
-        <p style="${styles.summary}">${escapeHtml(summary)}</p>
+        ${summary ? `<p style="${styles.summary}">${escapeHtml(summary)}</p>` : ""}
         ${renderSources(sources)}
       </div>
     </article>`;
@@ -148,7 +148,7 @@ function estimateArticleHeight(article) {
   if (sourceHeading) estimate += CARD_ESTIMATE.sourceHeading;
 
   const titleLines = estimatedLineCount(article.headline, CARD_ESTIMATE.titleCharsPerLine, 1);
-  const summaryLines = estimatedLineCount(compactSummary(article.summary), CARD_ESTIMATE.summaryCharsPerLine, 1);
+  const summaryLines = estimatedLineCount(compactSummary(article.summary), CARD_ESTIMATE.summaryCharsPerLine);
   estimate += titleLines * CARD_ESTIMATE.titleLine;
   estimate += summaryLines * CARD_ESTIMATE.summaryLine;
 

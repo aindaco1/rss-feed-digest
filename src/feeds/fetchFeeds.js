@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import * as cheerio from "cheerio/slim";
 import { mapLimit } from "../util/concurrency.js";
 import { discardResponseBody } from "../util/fetch.js";
 import { firstImageFromHtml, metaImageFromHtml } from "../util/html.js";
@@ -34,7 +35,7 @@ export async function fetchArticles(config, window, options = {}) {
   const results = await mapLimit(activeFeeds, concurrency, async (feed) => {
     try {
       const xml = await fetchConfiguredFeedXml(feed, window, options);
-      const parsed = await parser.parseString(xml);
+      const parsed = await parser.parseString(preserveAtomXhtml(xml));
       const normalizedArticles = normalizeFeedItems(feed, parsed, window);
       const articles = feed.excludeSponsored
         ? await filterSponsoredArticlePages(normalizedArticles, options)
@@ -75,6 +76,22 @@ export async function fetchArticles(config, window, options = {}) {
     failures,
     skippedFeeds
   };
+}
+
+function preserveAtomXhtml(xml) {
+  if (!/type\s*=\s*["']xhtml["']/i.test(xml)) return xml;
+  const $ = cheerio.load(xml, { xmlMode: true });
+  let changed = false;
+  $('[type="xhtml"]').each((_, element) => {
+    if (!["content", "summary", "title"].includes(element.name.split(":").at(-1))) return;
+    const node = $(element);
+    // rss-parser rebuilds nested XML with text before child elements, losing
+    // inline order. Atom's equivalent escaped-HTML form preserves that order.
+    const html = node.html();
+    node.attr("type", "html").text(html);
+    changed = true;
+  });
+  return changed ? $.xml() : xml;
 }
 
 async function fetchConfiguredFeedXml(feed, window, options = {}) {

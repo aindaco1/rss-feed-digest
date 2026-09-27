@@ -47,6 +47,8 @@ YouTube Shorts are filtered out. YTS release titles are shortened by removing so
 
 Clustering first combines exact canonical URL matches, then optionally uses embeddings for high-similarity articles. Its fallback scorer builds a corpus-weighted profile from each article's title, summary, text, and nearby phrase pairs. Terms and phrases that are rarer in the current candidate set carry more weight; low-signal template words are suppressed. Articles merge only when the semantic score is supported by shared signal terms or phrases.
 
+Shared-term counts include distinct terms only; a derived phrase does not count as another independent term. Low-signal words use the same normalization as article tokens. Sparse cross-source matches also require a shared phrase involving a title and the other article's lead. This preserves closely related roundups while rejecting generic overlaps such as “old school” and announcement templates.
+
 A second comparison pass lets later bridge articles merge earlier related clusters. Larger clusters require compatibility across the cluster so roundup posts do not connect unrelated stories.
 
 Embedding matches obey the same excluded-topic, standalone-video, and commerce/news boundaries. A vector match must meet the similarity threshold for every member of the candidate cluster; one highly similar roundup cannot connect unrelated stories. Embedding requests skip articles excluded from broad clustering and map responses by their explicit input index. Missing, invalid, or inconsistent vectors trigger the existing heuristic fallback.
@@ -55,6 +57,12 @@ Embedding matches obey the same excluded-topic, standalone-video, and commerce/n
 
 ## Summary coverage
 
-AI summaries receive each normalized source's summary and body (normalization retains up to 6,000 body characters). The prompt asks for distinct material details, qualifications, attributed disagreements, and uncertainty. Requests over 64,000 UTF-8 payload bytes use the source-excerpt fallback instead of dropping sources. Empty, incomplete, malformed, or unknown-topic output also falls back, and `aiFailures` records those attempts in digest JSON.
+AI summaries receive each normalized source's summary and body (normalization retains up to 6,000 body characters). Publisher-supplied summaries take precedence over body snippets. Atom XHTML is converted to equivalent escaped HTML before parsing so linked words remain in sentence order.
 
-The fallback joins distinct source excerpts in recency order, removing exact repeats. Source names and links remain in the card's source section. Both synthesized summaries and fallback excerpts render in full; the renderer no longer clips them at 280 characters. Cards can consequently be taller. This preserves supplied text, but cannot recover details omitted by a feed or guarantee that AI synthesis captures every important fact. See [quality checks](testing.md).
+Single articles and combined cards both use AI by default. `AI_MAX_CLUSTERS=0` covers the whole edition; a positive integer deliberately limits how many cards get attempts. `AI_SUMMARIZE_SINGLE_ARTICLES=false` remains an explicit opt-out. These settings are aligned in the workflow and environment example.
+
+The summarizer requests 2–4 concise sentences (fewer when the source is sparse), in one paragraph of at most 100 words. It prioritizes the main development and essential qualifications, costs, exclusions, attributed disagreements and uncertainty. Paragraph and word limits are validated before rendering. Invalid output or a failed request gets one retry, with a 45-second timeout per attempt and no additional SDK retries. Generated text is never clipped to satisfy the limit.
+
+After both attempts fail, the card retains its headline and every source link, with no summary or copied excerpt. Disabled AI, explicit limits and oversized inputs (over 64,000 UTF-8 payload bytes) also produce headline-only cards. Each card records `summaryKind` and `summaryReason`; aggregate `summaryCounts` distinguishes generated summaries, errors, disabled AI, disabled singles and capacity limits. `aiCalls` counts actual requests, `aiRetries` counts second attempts, and `aiFailures` counts cards that could not be summarized, including oversized inputs.
+
+This contract summarizes available feed content, not necessarily the complete web article. It cannot recover missing feed details or guarantee semantic accuracy. See [quality checks](testing.md).

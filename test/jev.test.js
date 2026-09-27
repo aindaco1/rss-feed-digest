@@ -14,7 +14,7 @@ function response(request, decision = "pass", model = "jev-1.13.0") {
     }])) };
 }
 
-test("offline capture runs the production aggregation, fallback and renderer without network", async () => {
+test("offline capture runs production aggregation and rendering with synthetic summary responses", async () => {
   const fetch = globalThis.fetch;
   globalThis.fetch = () => assert.fail("Offline capture attempted network");
   try {

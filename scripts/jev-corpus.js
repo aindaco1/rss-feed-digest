@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import * as cheerio from "cheerio/slim";
 import { clusterArticles, isEmbeddingCandidate } from "../src/cluster/clusterArticles.js";
-import { summarizeClusters } from "../src/ai/summarizeClusters.js";
+import { MAX_SUMMARY_WORDS, summarizeClusters } from "../src/ai/summarizeClusters.js";
 import { renderDigestEmail } from "../src/email/renderDigestEmail.js";
 import { cleanWhitespace, htmlToText } from "../src/util/html.js";
 
@@ -31,6 +31,9 @@ export function inspectCapture(clusters, digest, html) {
   if ($("article").length !== digest.articles.length) failures.push("Rendered card count differs from digest");
   const text = cleanWhitespace(htmlToText(html, { email: true }));
   for (const item of digest.articles) {
+    if (item.summary && (item.summary.split(/\s+/u).length > MAX_SUMMARY_WORDS || /[\r\n\u2028\u2029]/u.test(item.summary))) {
+      failures.push(`Summary exceeds paragraph/word limit: ${item.id}`);
+    }
     const card = $("article").filter((_, element) => $(element).find("h2 a").attr("href") === item.url);
     if (card.length !== 1 || !cleanWhitespace(card.text()).includes(cleanWhitespace(item.summary))) failures.push(`Rendered summary missing: ${item.id}`);
     if (!text.includes(cleanWhitespace(item.summary))) failures.push(`Email text summary missing: ${item.id}`);
@@ -46,8 +49,9 @@ export async function captureCorpus({ client, vectorsById } = {}) {
   const started = performance.now();
   const clusters = clusterArticles(articles, { vectorsById, env: {} });
   const digest = await summarizeClusters(clusters, config, {
-    env: { AI_CONCURRENCY: "1", AI_MAX_CLUSTERS: "3" }, model: "gpt-4.1-mini",
-    disableAI: !client, apiKey: client ? "injected-test-client" : undefined, client
+    env: { AI_CONCURRENCY: "1", AI_MAX_CLUSTERS: "3", AI_SUMMARIZE_SINGLE_ARTICLES: "false" }, model: "gpt-4.1-mini",
+    retry: false, apiKey: "injected-test-client",
+    client: client || { responses: { create: async payload => sourceCompositeResponse(payload) } }
   });
   const html = renderDigestEmail({ title: "Synthetic RSS quality review", dateLabel: "09/23/2026", topics: digest.topics });
   const $ = cheerio.load(html);
@@ -76,4 +80,15 @@ export async function captureCorpus({ client, vectorsById } = {}) {
     deterministicFailures: inspectCapture(clusters, digest, html),
     metrics: { elapsedMs: Math.round(performance.now() - started), articles: articles.length, clusters: clusters.length,
       embeddingCandidates: articles.filter(a => isEmbeddingCandidate(a, { env: {} })).length, summaryCalls: digest.aiCalls } };
+}
+
+// Offline candidates deliberately combine invented source text. This is a
+// fixture response, not a model evaluation or the product's failure fallback.
+export function sourceCompositeResponse(payload) {
+  const input = JSON.parse(payload.input[1].content);
+  return { status: "completed", output_text: JSON.stringify({
+    headline: input.articles[0].title,
+    summary: input.articles.map(a => a.summary).join(" "),
+    topic: input.articles[0].topicHint
+  }) };
 }

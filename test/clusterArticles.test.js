@@ -710,3 +710,38 @@ test("does not cluster YouTube videos through embeddings", () => {
     [1, 1]
   );
 });
+
+test("generic wording cannot combine unrelated stories in a busy edition", () => {
+  const cases = [
+    [
+      { title: "U2 Play Their Old High School On 50th Anniversary Of Their Formation", sourceName: "Music Wire", summary: "The band returned to the school in Dublin where its members first rehearsed together. They performed a concert for students." },
+      { title: "Old-School Credit Card Scams Are Far From Dead", sourceName: "Tech Wire", summary: "In an era of increasingly sophisticated AI-fueled scams, a retro threat may be lurking in your mailbox." }
+    ],
+    [
+      { title: "Quince Luggage Is Affordable but Doesn’t Feel Cheap", sourceName: "Reviews", summary: "We tested its luggage and compared the price with other suitcases." },
+      { title: "Nippon Ichi Is Researching AI But Doesn’t Think It Will Make Development Faster", sourceName: "Games", summary: "The company wants tools that improve the quality of its games." }
+    ],
+    [
+      { title: "2011 Scorsese Classic Lost Millions, Then Went on to Sweep the Oscars", summary: "Hugo was one of the movies that went on to win awards despite massive losses." },
+      { title: "5 Movies That Survived Production Nightmares", summary: "These movies went through massive production difficulties. One involved a studio dispute." }
+    ],
+    [
+      { title: "Remi Wolf Releases a New Song", summary: "The musician's new music draws on rock influences. She says the song previews an album." },
+      { title: "Todd Rundgren Says Taylor Swift Ruined Music", summary: "The rock musician says he dislikes her songwriting and music." }
+    ],
+    [
+      { title: "Silver Lantern Announces New Album: Hear First Single", summary: "The band shares a new album and song due this fall." },
+      { title: "Velvet Meadow Announces New Album: Hear First Single", summary: "The singer shares a new album and song due this fall." }
+    ],
+    [
+      { title: "Administration risks freeing convicted criminals in international court dispute", sourceName: "Politics Wire", summary: "A scholar argued that the Trump administration risks weakening the International Criminal Court and freeing defendants." },
+      { title: "Appeals Court Lets Pentagon Designate Anthropic a Supply-Chain Risk", sourceName: "Tech Wire", summary: "The AI lab had argued multiple violations of its rights, but a divided panel of judges sided with the Trump administration." }
+    ]
+  ];
+  const context = Array.from({ length: 25 }, (_, i) => article({ id: `background-${i}`, title: `Unconnected bulletin ${i}`, topicHint: "Local" }));
+  for (const pair of cases) {
+    const rows = pair.map((a, i) => article({ id: `target-${i}`, ...a }));
+    const clusters = clusterArticles([...context, ...rows], { env: {} });
+    assert.ok(!clusters.some(c => c.articles.filter(a => a.id.startsWith("target-")).length > 1), pair.map(a => a.title).join(" / "));
+  }
+});

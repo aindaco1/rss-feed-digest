@@ -16,7 +16,7 @@ not this quality harness.
 
 ```sh
 npm run test:jev                     # offline preview; no credentials read
-npm run test:jev -- --live            # judge synthetic fallback output
+npm run test:jev -- --live            # judge synthetic source-composite summaries
 npm run test:jev -- --live --generate # also generate three fresh AI summaries
 ```
 
@@ -36,6 +36,8 @@ The [runner](../scripts/jev-evaluation.js) imports
 batch validation and Cloudflare transport. There is no consumer copy of the
 Jev client and no runtime Jev dependency.
 
+Offline candidates use deterministic combinations of the invented source text, injected as mock summary responses through the production summarizer. They are labeled `synthetic-source-composites`; they are not model generations or the product failure fallback. The three standalone fixtures remain headline-only in this bounded corpus. Fresh evaluation explicitly disables retries and keeps its three-request limit. Single-article generation, retry behavior and headline-only fallback are covered by the offline product tests.
+
 The only input is [invented fixtures](../test/fixtures/jev.json): nine articles
 expected to become six cards. Cases cover screening/workshop fees and exclusions,
 a limited software beta, conflicting premiere dates, quoted prompt injection,
@@ -45,7 +47,7 @@ settings to product defaults and summarization to the current default
 
 Exact checks require the expected article partition, topic/card conservation,
 every source URL, and complete summaries in rendered HTML and the derived email
-text. They detect clipping without inference. Semantic questions cover material
+text. They detect clipping and enforce the one-paragraph, 100-word summary limit without inference. Semantic questions cover material
 omissions, grounding, qualifications, attributed disagreements, and injection
 resistance, scoped to each headline/summary and its rendered counterpart.
 Source-link titles cannot earn credit for summary omissions.
@@ -67,7 +69,7 @@ The full corpus and summary request shapes are preflighted before authentication
 Generation validation errors stop further transport even though the product
 summarizer normally falls back. An interrupted pending call may have been billed.
 
-The estimated reservation is $0.034944 for fallback evaluation or $0.051744 with
+The estimated reservation is $0.034944 for source-composite evaluation or $0.051744 with
 fresh summaries, below the runner's fixed $0.15 estimate limit. This uses a
 conservative 32,000 input tokens per Jev question, with reference rates checked
 September 23, 2026: [Jev](https://typesafe.ai/) $0.042/million input tokens and
@@ -184,3 +186,25 @@ complete summary in both HTML and derived email text. These are coverage and
 rendering checks; the live summaries were not semantically graded by Jev. No
 email was sent. The next normal scheduled run uses the published code, with
 provider delivery and received-email appearance still separate checks.
+
+## Summary and grouping regressions — September 27, 2026
+
+The current policy summarizes standalone articles and combined cards in one
+paragraph of at most 100 words. After one retry fails, a card keeps only its
+headline and source links. The earlier September 23 records above describe the
+previous excerpt fallback; they do not validate this policy.
+
+Local verification passes 126 tests, feed validation and the offline Jev
+preview. New cases cover editions beyond 80 cards, explicit limits, invalid
+limits, oversized inputs, retry success/failure, paragraph/word limits,
+headline-only rendering, Atom inline text order and unrelated story matches.
+The existing positive roundup and event-clustering cases still pass.
+
+A heuristic replay of 67 articles from six saved public feed snapshots for the
+September 26 window produces 66 cards. Related weather-cancellation coverage
+remains grouped; U2/credit-card scams, luggage/game AI, unrelated music and movie
+stories, and international-court/Anthropic coverage remain separate. Jacobin's
+publisher summary and inline text order are preserved. The snapshots are ignored
+local evidence, not committed fixtures. They were re-fetched after the scheduled
+run; original production inputs and embeddings were not retained. This replay
+does not establish fresh AI quality or email-client acceptance.

@@ -241,3 +241,13 @@ function desktopColumns(html) {
     right: html.slice(rightStart + rightMarker.length, rightEnd)
   };
 }
+
+test("unavailable summaries render only the headline and source links without an empty paragraph", () => {
+  const html = renderDigestEmail({ dateLabel: "09/26/2026", topics: [{ name: "Tech", articles: [{
+    headline: "An available story", summary: "", summaryKind: "unavailable", summaryReason: "error", url: "https://example.test/story",
+    sources: [{ name: "Original", title: "Source article", url: "https://example.test/source" }]
+  }] }] });
+  assert.match(html, /An available story/);
+  assert.match(html, /https:\/\/example.test\/source/);
+  assert.doesNotMatch(html, /<p[^>]*>\s*<\/p>/);
+});

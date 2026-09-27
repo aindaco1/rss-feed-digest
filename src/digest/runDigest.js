@@ -64,6 +64,8 @@ const digest = await summarizeClusters(clusters, config, {
 
 console.log(`AI summary calls: ${digest.aiCalls}`);
 console.log(`AI summary fallbacks after errors: ${digest.aiFailures}`);
+console.log(`AI summary retries: ${digest.aiRetries}`);
+console.log(`Summary coverage: ${JSON.stringify(digest.summaryCounts)}`);
 
 const subject = `${config.digest.title} - ${window.dateLabel}`;
 const html = renderDigestEmail({
@@ -99,6 +101,8 @@ writeFileSync(
       clusterCount: clusters.length,
       aiCalls: digest.aiCalls,
       aiFailures: digest.aiFailures,
+      aiRetries: digest.aiRetries,
+      summaryCounts: digest.summaryCounts,
       topics: digest.topics
     },
     null,
