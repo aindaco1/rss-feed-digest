@@ -56,6 +56,18 @@ if (useEmbeddings && articles.length) {
 const clusters = clusterArticles(articles, { vectorsById });
 console.log(`Clustered into ${clusters.length} digest items.`);
 
+if (dryRun && hasFlag(args, "capture-inputs")) {
+  mkdirSync(outDir, { recursive: true });
+  // Opt-in reproduction data. Omit feed URLs, author details and provider metadata.
+  const fields = ["id", "title", "url", "canonicalUrl", "sourceName", "sourceType", "topicHint", "publishedAt", "summary", "text"];
+  writeFileSync(new URL(`grouping-inputs-${window.slug}.json`, outDir), JSON.stringify({
+    articles: articles.map(article => Object.fromEntries(fields.map(key => [key, article[key]]))),
+    vectors: [...vectorsById],
+    settings: Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+      /^(?:CLUSTER_|EMBEDDING_CLUSTER_|NO_BROAD_CLUSTER_TOPICS$)/.test(key)))
+  }));
+}
+
 const digest = await summarizeClusters(clusters, config, {
   apiKey,
   disableAI: !useAI,

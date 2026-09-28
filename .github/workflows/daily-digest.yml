@@ -30,6 +30,10 @@ on:
         description: "Run only the bounded model comparison; never build or send a digest"
         type: boolean
         default: false
+      capture_inputs:
+        description: "Capture grouping inputs and embeddings only; no summaries or email"
+        type: boolean
+        default: false
       comparison_articles:
         description: "Comparison cases JSON (public normalized source snapshots; at most 48 KB)"
         type: string
@@ -139,6 +143,9 @@ jobs:
 
           if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.dry_run }}" != "true" ]]; then
             send=true
+          fi
+          if [[ "${{ inputs.capture_inputs }}" == "true" ]]; then
+            send=false
           fi
 
           echo "should_run=${should_run}" >> "${GITHUB_OUTPUT}"
@@ -258,6 +265,9 @@ jobs:
         shell: bash
         run: |
           args=()
+          if [[ "${{ inputs.capture_inputs }}" == "true" ]]; then
+            args+=(--capture-inputs --no-ai --no-og-images)
+          fi
 
           if [[ "${{ steps.mode.outputs.send }}" == "true" ]]; then
             args+=(--send)
