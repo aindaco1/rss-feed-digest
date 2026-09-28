@@ -57,7 +57,7 @@ function normalizeItem(feedConfig, item, sourceImageUrl) {
 
   const contentHtml = item.contentEncoded || item["content:encoded"] || item.content || item.description || "";
   const text = stripFeedBoilerplate(htmlToText(contentHtml), { title: rawTitle });
-  const summarySource = item.contentSnippet || item.summary || item.description || mediaDescriptionFromItem(item) || text;
+  const summarySource = item.summary || item.description || item.contentSnippet || mediaDescriptionFromItem(item) || text;
   const rawSummary = stripFeedBoilerplate(textFromMaybeHtml(summarySource), { title: rawTitle });
   const summary = cleanArticleSummary(rawSummary || text, feedConfig).slice(0, 1200);
 

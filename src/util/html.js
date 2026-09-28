@@ -21,6 +21,8 @@ export function htmlToText(html = "", { email = false } = {}) {
     return $.root().text().split(/\n/).map(cleanWhitespace)
       .join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
+  $("br").replaceWith(" ");
+  $("p, div, h1, h2, h3, li, tr, blockquote").prepend(" ").append(" ");
   return cleanWhitespace($.root().text());
 }
 

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
 import { callCloudflareJev, createJevRequest, evaluateJevCases, judgeJevResponse } from "@dustwave/test-core/jev";
-import { captureCorpus, fixture } from "./jev-corpus.js";
+import { captureCorpus, fixture, sourceCompositeResponse } from "./jev-corpus.js";
 import { isDirectRun } from "../src/util/modules.js";
 import { parseSummaryResponse } from "../src/ai/summarizeClusters.js";
 
@@ -19,7 +19,7 @@ export function prepareBudget(cases, generate = false) {
     row.candidate, row.requirements, { reference: row.reference }).input.questions).length, 0);
   // Vendor reference rates checked 2026-09-23, not provider-enforced billing caps.
   const reservedEstimateUsd = questionCount * 32_000 * 0.042 / 1e6 +
-    (generate ? MAX_SUMMARIES * (MAX_SUMMARY_BYTES * 0.40 + MAX_OUTPUT_TOKENS * 1.60) / 1e6 : 0);
+    (generate ? MAX_SUMMARIES * (MAX_SUMMARY_BYTES * 0.75 + MAX_OUTPUT_TOKENS * 4.50) / 1e6 : 0);
   if (questionCount > MAX_QUESTIONS || reservedEstimateUsd > 0.15) throw new Error("Pilot exceeds budget");
   return { questionCount, maxJevRequests: cases.length, maxSummaryRequests: generate ? MAX_SUMMARIES : 0,
     reservedEstimateUsd, estimatedLimitUsd: 0.15, isBillingCap: false };
@@ -84,12 +84,10 @@ export async function runEvaluation(cases, { call, save = async () => {} } = {})
 async function preflightGeneration() {
   const requests = [];
   const captured = await captureCorpus({ client: { responses: { create: async payload => {
-    const input = JSON.parse(payload.input[1].content);
     const request = { ...payload, max_output_tokens: MAX_OUTPUT_TOKENS, store: false };
     if (Buffer.byteLength(JSON.stringify(request)) > MAX_SUMMARY_BYTES) throw new Error("Summary request too large");
     requests.push(request);
-    return { status: "completed", output_text: JSON.stringify({ headline: input.articles[0].title,
-      summary: input.articles.map(a => a.summary).join(" "), topic: input.articles[0].topicHint }) };
+    return sourceCompositeResponse(payload);
   } } } });
   if (requests.length !== MAX_SUMMARIES || captured.deterministicFailures.length) throw new Error("Generation preflight failed");
   return requests;
@@ -97,7 +95,7 @@ async function preflightGeneration() {
 
 export async function main(args = process.argv.slice(2)) {
   if (args.length === 1 && args[0] === "--help") {
-    console.log("npm run test:jev -- [--live [--generate]]\nDefault: offline preview. --live judges synthetic source-excerpt output; --generate also calls the production OpenAI summarizer. Never reads live feeds or sends email.");
+    console.log("npm run test:jev -- [--live [--generate]]\nDefault: offline preview. --live judges synthetic source-composite summaries; --generate also calls the production OpenAI summarizer. Never reads live feeds or sends email.");
     return 0;
   }
   if (args.some(a => !["--live", "--generate"].includes(a)) || new Set(args).size !== args.length ||
@@ -120,7 +118,7 @@ export async function main(args = process.argv.slice(2)) {
     "src/ai/summarizeClusters.js", "src/ai/embeddings.js", "src/cluster/clusterArticles.js", "src/email/renderDigestEmail.js",
     "src/util/html.js", "src/util/appLinks.js", "src/util/concurrency.js", "src/util/hash.js", "src/util/urls.js",
     "shared/dust-wave-platform/packages/test-core/src/jev.js", "shared/dust-wave-platform/packages/worker-core/src/response-body.js"];
-  const metadata = { mode: live ? "live" : "preview", candidateOrigin: generate ? "pending-generation" : "source-excerpts",
+  const metadata = { mode: live ? "live" : "preview", candidateOrigin: generate ? "pending-generation" : "synthetic-source-composites",
     classification: fixture.classification, labelProvenance: fixture.labelProvenance, policyCalibrated: false, budget,
     sourceHashes: Object.fromEntries(sourcePaths.map(path => [path, sha256(readFileSync(new URL(`../${path}`, import.meta.url)))])) };
   const generation = [];

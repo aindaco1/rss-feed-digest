@@ -690,3 +690,26 @@ test("matches simple feed URLs to Feedbin root site subscriptions", async () => 
   assert.match(xml, /JoBlo Cached Post/);
   assert.match(xml, /Cached JoBlo body/);
 });
+
+test("preserves Atom XHTML inline order and prefers the publisher summary", async () => {
+  const xml = `<?xml version="1.0"?>
+    <feed xmlns="http://www.w3.org/2005/Atom"><title>Example</title>
+      <entry><title>Archive opens</title><id>https://example.test/archive</id>
+        <updated>2026-09-26T10:00:00Z</updated>
+        <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">The <b>archive</b> opens Monday.</div></summary>
+        <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Visitors must <a href="https://example.test/register">register</a> before <em>Friday</em>.</p><p>Admission is free &amp; accessible.</p><img src="https://example.test/photo.jpg" /></div></content>
+      </entry>
+      <entry><title>Escaped HTML</title><id>https://example.test/escaped</id>
+        <updated>2026-09-26T10:00:00Z</updated>
+        <content type="html">&lt;p&gt;First &lt;b&gt;inline&lt;/b&gt; sentence.&lt;/p&gt;&lt;p&gt;Second sentence.&lt;/p&gt;</content>
+      </entry>
+    </feed>`;
+  const { articles, failures } = await fetchArticles({ feeds: [{ title: "Example", feedUrl: "https://example.test/feed", topic: "Film" }] }, {
+    start: new Date("2026-09-26T00:00:00Z"), end: new Date("2026-09-27T00:00:00Z")
+  }, { env: {}, fetchImpl: async () => new Response(xml) });
+  assert.deepEqual(failures, []);
+  assert.equal(articles[0].summary, "The archive opens Monday.");
+  assert.equal(articles[0].text, "Visitors must register before Friday. Admission is free & accessible.");
+  assert.equal(articles[0].imageUrl, "https://example.test/photo.jpg");
+  assert.equal(articles[1].text, "First inline sentence. Second sentence.");
+});

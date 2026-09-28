@@ -26,6 +26,18 @@ on:
         required: false
         type: boolean
         default: true
+      compare_summaries:
+        description: "Run only the bounded model comparison; never build or send a digest"
+        type: boolean
+        default: false
+      capture_inputs:
+        description: "Capture grouping inputs and embeddings only; no summaries or email"
+        type: boolean
+        default: false
+      comparison_articles:
+        description: "Comparison cases JSON (public normalized source snapshots; at most 48 KB)"
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -35,15 +47,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  compare-summaries:
+    if: github.event_name == 'workflow_dispatch' && inputs.compare_summaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Compare summaries without sending email
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUMMARY_COMPARISON_ARTICLES: ${{ inputs.comparison_articles }}
+        run: node scripts/compare-summaries.js --live
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: always()
+        with:
+          name: summary-comparison
+          path: out/summary-comparison/
+          retention-days: 7
   digest:
+    if: ${{ !inputs.compare_summaries }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
       DIGEST_REPLY_TO_EMAIL: ${{ vars.DIGEST_REPLY_TO_EMAIL || '' }}
-      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4.1-mini' }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-mini' }}
       OPENAI_EMBEDDING_MODEL: ${{ vars.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
-      AI_MAX_CLUSTERS: ${{ vars.AI_MAX_CLUSTERS || '80' }}
-      AI_SUMMARIZE_SINGLE_ARTICLES: ${{ vars.AI_SUMMARIZE_SINGLE_ARTICLES || 'false' }}
+      AI_MAX_CLUSTERS: ${{ vars.AI_MAX_CLUSTERS || '0' }}
+      AI_SUMMARIZE_SINGLE_ARTICLES: ${{ vars.AI_SUMMARIZE_SINGLE_ARTICLES || 'true' }}
       AI_CONCURRENCY: ${{ vars.AI_CONCURRENCY || '2' }}
       FEED_CONCURRENCY: ${{ vars.FEED_CONCURRENCY || '2' }}
       FEED_FETCH_ATTEMPTS: ${{ vars.FEED_FETCH_ATTEMPTS || '4' }}
@@ -106,6 +143,9 @@ jobs:
 
           if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.dry_run }}" != "true" ]]; then
             send=true
+          fi
+          if [[ "${{ inputs.capture_inputs }}" == "true" ]]; then
+            send=false
           fi
 
           echo "should_run=${should_run}" >> "${GITHUB_OUTPUT}"
@@ -225,6 +265,9 @@ jobs:
         shell: bash
         run: |
           args=()
+          if [[ "${{ inputs.capture_inputs }}" == "true" ]]; then
+            args+=(--capture-inputs --no-ai --no-og-images)
+          fi
 
           if [[ "${{ steps.mode.outputs.send }}" == "true" ]]; then
             args+=(--send)

@@ -14,7 +14,7 @@ function response(request, decision = "pass", model = "jev-1.13.0") {
     }])) };
 }
 
-test("offline capture runs the production aggregation, fallback and renderer without network", async () => {
+test("offline capture runs production aggregation and rendering with synthetic summary responses", async () => {
   const fetch = globalThis.fetch;
   globalThis.fetch = () => assert.fail("Offline capture attempted network");
   try {
@@ -27,10 +27,30 @@ test("offline capture runs the production aggregation, fallback and renderer wit
     assert.equal(report.complete, false);
     assert.equal(report.networkAttempts, 0);
     assert.equal(report.releaseAccepted, false);
-    assert.equal(outcome(report, captured.cases).unevaluated, 26);
+    assert.equal(outcome(report, captured.cases).unevaluated, 32);
     assert.equal(prepareBudget(captured.cases, true).maxSummaryRequests, 3);
     assert.ok(!JSON.stringify(report.cases.map(row => row.request)).includes('"expected"'));
   } finally { globalThis.fetch = fetch; }
+});
+
+test("summary fidelity controls expose three false passes from a shared-vocabulary judge", async () => {
+  const controls = (await captureCorpus()).cases.filter(c => c.id.startsWith("control-summary-"));
+  // Frozen, deliberately narrow simulators. Neither reads the expected labels.
+  const faithful = candidate => /assembly is expected|school's kitchen|launched new/.test(candidate) ? "fail" : "pass";
+  const naive = (candidate, reference) => ["Brickworks", "Satellites", "Lumen"].some(
+    name => candidate.includes(name) && reference.includes(name)) ? "pass" : "fail";
+  for (const [judge, expectedFalsePassIds] of [[faithful, []], [naive, [
+    "control-summary-figurative-fail", "control-summary-location-fail", "control-summary-sale-fail"
+  ]]]) {
+    const report = await runEvaluation(controls, { call: async request => response(request,
+      judge(request.input.state.candidate, request.input.state.reference)) });
+    const score = outcome(report, controls);
+    const ids = report.cases.filter(row => controls.find(c => c.id === row.id).expected === "fail" &&
+      row.result.findings.fidelity.decision === "pass").map(row => row.id);
+    assert.equal(score.falseFailures, 0);
+    assert.equal(score.falsePasses, expectedFalsePassIds.length);
+    assert.deepEqual(ids, expectedFalsePassIds);
+  }
 });
 
 test("exact checks catch summary clipping, missing sources, and lost topics", async () => {

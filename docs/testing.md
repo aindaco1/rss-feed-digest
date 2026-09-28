@@ -16,7 +16,7 @@ not this quality harness.
 
 ```sh
 npm run test:jev                     # offline preview; no credentials read
-npm run test:jev -- --live            # judge synthetic fallback output
+npm run test:jev -- --live            # judge synthetic source-composite summaries
 npm run test:jev -- --live --generate # also generate three fresh AI summaries
 ```
 
@@ -36,21 +36,27 @@ The [runner](../scripts/jev-evaluation.js) imports
 batch validation and Cloudflare transport. There is no consumer copy of the
 Jev client and no runtime Jev dependency.
 
+Offline candidates use deterministic combinations of the invented source text, injected as mock summary responses through the production summarizer. They are labeled `synthetic-source-composites`; they are not model generations or the product failure fallback. The three standalone fixtures remain headline-only in this bounded corpus. Fresh evaluation explicitly disables retries and keeps its three-request limit. Single-article generation, retry behavior and headline-only fallback are covered by the offline product tests.
+
 The only input is [invented fixtures](../test/fixtures/jev.json): nine articles
 expected to become six cards. Cases cover screening/workshop fees and exclusions,
 a limited software beta, conflicting premiere dates, quoted prompt injection,
 separate local updates, and a standalone video. Evaluation fixes clustering
 settings to product defaults and summarization to the current default
-`gpt-4.1-mini`, independent of ambient model/concurrency settings.
+`gpt-5.4-mini`, independent of ambient model/concurrency settings.
 
 Exact checks require the expected article partition, topic/card conservation,
 every source URL, and complete summaries in rendered HTML and the derived email
-text. They detect clipping without inference. Semantic questions cover material
+text. They detect clipping and enforce the one-paragraph, 100-word summary limit without inference. Semantic questions cover material
 omissions, grounding, qualifications, attributed disagreements, and injection
 resistance, scoped to each headline/summary and its rendered counterpart.
 Source-link titles cannot earn credit for summary omissions.
 
-Eight labeled positive/negative controls check the judge. Labels are not sent in
+Fourteen labeled positive/negative controls check the judge, including figurative
+language, correct locations and sales versus product launches. Frozen offline
+simulators confirm that a shared-vocabulary shortcut produces exactly three false
+passes on the new minimal pairs, while a faithful simulator produces none. These
+simulations validate the controls, not Jev's accuracy. Labels are not sent in
 model inputs. These are engineering-authored regressions, not independent human
 calibration or an unseen holdout. The 0.10 probability margin is provisional;
 unknown returned models, uncertainty and near ties require review. Current
@@ -59,7 +65,7 @@ version pin. Never change a label or threshold merely to turn failures green.
 
 ## Bounds and evidence
 
-The prepared corpus has 14 Jev requests / 26 questions. Hard limits are 40
+The prepared corpus has 20 Jev requests / 32 questions. Hard limits are 40
 questions, 32,000 UTF-8 bytes per Jev request, and three optional summary requests
 of at most 10,000 serialized bytes / 1,000 output tokens. Calls run sequentially
 with a 45-second timeout and no automatic retries, fallback provider, or resume.
@@ -67,12 +73,12 @@ The full corpus and summary request shapes are preflighted before authentication
 Generation validation errors stop further transport even though the product
 summarizer normally falls back. An interrupted pending call may have been billed.
 
-The estimated reservation is $0.034944 for fallback evaluation or $0.051744 with
+The estimated reservation is $0.043008 for source-composite evaluation or $0.079008 with
 fresh summaries, below the runner's fixed $0.15 estimate limit. This uses a
 conservative 32,000 input tokens per Jev question, with reference rates checked
-September 23, 2026: [Jev](https://typesafe.ai/) $0.042/million input tokens and
-[GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
-$0.40/$1.60 per million input/output tokens. Estimates are not billing caps or
+September 23, 2026: [Jev](https://typesafe.ai/) $0.042/million input tokens, and
+September 27, 2026: [GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
+$0.75/$4.50 per million input/output tokens. Estimates are not billing caps or
 receipts; provider/account pricing and fees remain authoritative.
 
 Each run creates a unique ignored `out/jev/<timestamp>-<UUID>/` directory with
@@ -184,3 +190,106 @@ complete summary in both HTML and derived email text. These are coverage and
 rendering checks; the live summaries were not semantically graded by Jev. No
 email was sent. The next normal scheduled run uses the published code, with
 provider delivery and received-email appearance still separate checks.
+
+## Summary and grouping regressions — September 27, 2026
+
+The current policy summarizes standalone articles and combined cards in one
+paragraph of at most 100 words. After one retry fails, a card keeps only its
+headline and source links. The earlier September 23 records above describe the
+previous excerpt fallback; they do not validate this policy.
+
+Local verification passes 129 tests, feed validation and the offline Jev
+preview. New cases cover editions beyond 80 cards, explicit limits, invalid
+limits, oversized inputs, retry success/failure, paragraph/word limits,
+headline-only rendering, short-teaser limits, Atom inline text order and unrelated story matches.
+The existing positive roundup and event-clustering cases still pass.
+
+A heuristic replay of 67 articles from six saved public feed snapshots for the
+September 26 window produces 66 cards. Related weather-cancellation coverage
+remains grouped; U2/credit-card scams, luggage/game AI, unrelated music and movie
+stories, and international-court/Anthropic coverage remain separate. Jacobin's
+publisher summary and inline text order are preserved. The snapshots are ignored
+local evidence, not committed fixtures. They were re-fetched after the scheduled
+run; original production inputs and embeddings were not retained. This replay
+does not establish fresh AI quality or email-client acceptance.
+
+A further replay of 13 MacRumors/Verge feed articles found an Apple roundup
+bridged through the generic words `some`, `Pro` and `mini`. Excluding those from
+match evidence separates cellular trouble and camera coverage from device leaks
+while retaining the related leak roundup. Two additional negative pairs cover
+the failure, and the existing RFK/raw-milk and other positive roundups still pass.
+The user confirmed grouping by product or announcement rather than company.
+A further negative pair separates Ubisoft's Zelda project from Beyond Good and
+Evil 2; the generic verb `working` no longer supplies grouping evidence.
+
+The full hosted edition exposed a remaining publisher-name bridge that the small
+feed replay missed. Exact captured inputs reproduce it: the previous rule makes
+233 cards and folds cellular trouble into a device-leak roundup. Requiring a
+meaningful anchor across every cluster member, excluding publisher names, makes
+234 cards and separates that story while keeping the six related leak sources
+together. An invented five-article regression reproduces the publisher bridge;
+existing sparse same-event follow-ups still pass.
+
+For exact reproductions, dispatch Daily Digest with `capture_inputs=true`.
+It forces a dry run, skips summary generation and image hydration, and saves
+normalized article text, vectors and clustering settings in an ignored output
+artifact. Feed URLs, author details and provider metadata are omitted. This
+opt-in capture is never enabled for scheduled sends. The CLI equivalent is
+`--dry-run --capture-inputs --no-ai --no-og-images`. Treat the captured source
+text as diagnostic data; do not commit it as fixtures.
+
+### Final hosted preview
+
+The [final September 26-window preview](https://github.com/aindaco1/rss-feed-digest/actions/runs/36361617916)
+ran revision `6870ab3a3529b83b7b946c0741adec00b4a4578a` with GPT-5.4 mini:
+263 articles became 234 cards, all with generated summaries. There were 235 AI
+calls, one successful retry, zero exhausted summaries and zero feed failures;
+the previously disabled Okayplayer feed remained separately recorded as skipped.
+The longest summary was 96 words. Checks confirmed one paragraph per summary,
+all 263 source links and complete summary text in HTML and derived email text.
+Raw Story had 5/5 summarized cards, Jacobin 6/6, and No Film School 12/12.
+
+The reviewed output keeps U2 separate from credit-card scams, cellular problems
+separate from the six-source Apple code-leak roundup, and Ubisoft's Zelda report
+separate from Beyond Good and Evil 2. The Lego summary omits the figurative
+assembly-time claim. These selected semantic checks do not grade every summary
+in the edition. Summaries remain limited to supplied feed text, which can be a
+teaser or a body capped at 6,000 characters.
+
+The [same-revision CI run](https://github.com/aindaco1/rss-feed-digest/actions/runs/36361620085)
+passed all 129 tests, static validation of 52 feeds / 13 topics, and the offline
+Jev preview. No email was sent during this preview. The repository model variable
+was set to `gpt-5.4-mini` after user approval; delivery and received-email rendering
+remain separate from these generation and artifact checks.
+
+### Bounded comparison of summary models
+
+`node scripts/compare-summaries.js --input=/path/to/cases.json` validates and
+saves a zero-network preview. Add `--live` with process `OPENAI_API_KEY` to compare
+GPT-4.1 mini with GPT-5.4 mini using the production summarizer and renderer.
+The input is 1–8 cases (`id`, `review`, `articles`), each containing 1–3 normalized
+public articles. Keep source snapshots in ignored `out/`, not tracked fixtures.
+The complete input is limited to 48 KB. Two rounds per model permit at most
+64 requests including the product's one retry. Model outputs remain subject to
+manual semantic review; a completed run is not an accuracy pass.
+
+For hosted use, dispatch Daily Digest with `compare_summaries=true` and the JSON
+in `comparison_articles`. This skips the digest job and uses only the OpenAI
+credential; it cannot send mail. The `summary-comparison` artifact contains the
+inputs, generated cards, rendered HTML, calls/retries, timing, reported usage and
+estimated token cost. Comparison does not change the production model setting.
+
+The [September 27 comparison](https://github.com/aindaco1/rss-feed-digest/actions/runs/36359836400)
+generated 32 summaries from eight public article snapshots, twice per model,
+without retries or failures. GPT-4.1 mini presented the Lego assembly-time joke
+as fact in both rounds; GPT-5.4 mini omitted it in both. Both models kept the
+lens sale prices, and the stronger model produced shorter teaser summaries.
+Manual review favored GPT-5.4 mini; the user approved the switch. Token estimates
+were $0.0100104 for GPT-4.1 mini and $0.0181743 for GPT-5.4 mini. These include
+reported cache hits, are not billing receipts, and are not a whole-edition cost
+forecast. The small, selected sample is not a calibrated accuracy benchmark.
+
+The new Jev fidelity controls have passed offline simulation only. Live grading
+is pending refreshed Cloudflare credentials and a selected account. Jev remains
+advisory: it neither writes summaries nor changes runtime acceptance. Its shared
+Platform adapter and dependency pin are unchanged.

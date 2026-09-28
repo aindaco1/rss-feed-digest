@@ -1,6 +1,7 @@
 import { digestHash } from "../util/hash.js";
 
 const STOP_WORDS = new Set([
+  "but", "doesn", "don", "isn", "aren", "some", "then", "there", "these", "those", "won", "would",
   "a",
   "about",
   "above",
@@ -64,6 +65,8 @@ const STOP_WORDS = new Set([
 ]);
 
 const LOW_SIGNAL_TERMS = new Set([
+  "album", "already", "biggest", "ever", "exclusive", "film", "first", "got", "great", "hear", "music",
+  "old", "one", "pro", "mini", "release", "says", "share", "song", "thing", "time", "went",
   "1hr",
   "allegedly",
   "announce",
@@ -147,6 +150,7 @@ const LOW_SIGNAL_TERMS = new Set([
   "watt",
   "weekend",
   "work",
+  "working",
   "year",
   "january",
   "february",
@@ -160,6 +164,13 @@ const LOW_SIGNAL_TERMS = new Set([
   "november",
   "december"
 ]);
+
+// Compare stop signals in the same normalized form as article tokens (movies,
+// releases, etc.), so inflections cannot turn template language into anchors.
+const LOW_SIGNAL_TOKENS = new Set([...LOW_SIGNAL_TERMS].map(normalizeToken));
+// Event verbs can support a phrase such as "Wolverine reveal", but cannot
+// independently justify merging articles merely published close together.
+const EVENT_VERBS = new Set(["reveal", "unveil"]);
 
 const FIELD_WEIGHTS = {
   titleTerm: 4,
@@ -341,14 +352,14 @@ function pairEvidence(a, b) {
     hasCommerceArticle: a.isCommerce || b.isCommerce,
     minutesApart: minutesApart(a.publishedAt, b.publishedAt),
     semanticScore: weightedCosine(a.vector, b.vector, a.magnitude, b.magnitude),
-    sharedSignals: intersectionSize(a.signals, b.signals),
+    sharedSignals: sharedTerms(a.signals, b.signals).size,
     sharedPhraseSignals: intersectionSize(a.phraseSignals, b.phraseSignals),
-    sharedTitleSignals: intersectionSize(a.titleSignals, b.titleSignals),
-    sharedLeadSignals: intersectionSize(a.leadSignals, b.leadSignals),
+    sharedTitleSignals: sharedTerms(a.titleSignals, b.titleSignals).size,
+    sharedLeadSignals: sharedTerms(a.leadSignals, b.leadSignals).size,
     sharedTitlePhraseSignals: intersectionSize(a.titlePhraseSignals, b.titlePhraseSignals),
     sharedTitleLeadSignals:
-      intersectionSize(termSignals(a.titleSignals), termSignals(b.leadSignals)) +
-      intersectionSize(termSignals(a.leadSignals), termSignals(b.titleSignals)),
+      [...union(sharedTerms(a.titleSignals, b.leadSignals), sharedTerms(a.leadSignals, b.titleSignals))]
+        .filter((feature) => !EVENT_VERBS.has(feature.slice(2))).length,
     sharedTitleLeadPhraseSignals:
       intersectionSize(a.titlePhraseSignals, b.leadPhraseSignals) +
       intersectionSize(a.leadPhraseSignals, b.titlePhraseSignals)
@@ -368,7 +379,8 @@ function isCrossSourceMatch(evidence, settings) {
       evidence.sharedTitleSignals >= settings.minSharedSignals) ||
     (evidence.semanticScore >= settings.crossSourceSparseSemanticThreshold &&
       evidence.sharedTitleSignals >= 1 &&
-      evidence.sharedSignals >= settings.minSharedSignals + 1) ||
+      evidence.sharedSignals >= settings.minSharedSignals &&
+      evidence.sharedTitleLeadPhraseSignals >= settings.minSharedPhrases) ||
     (evidence.semanticScore >= settings.crossSourceSparseSemanticThreshold &&
       evidence.sharedSignals >= settings.minSharedSignals + 6 &&
       evidence.sharedPhraseSignals >= settings.minSharedStrongPhrases + 1) ||
@@ -615,7 +627,7 @@ function isSignalFeature(feature, documentFrequency, articleCount) {
 function isSignalToken(term) {
   return (
     term.length > 2 &&
-    !LOW_SIGNAL_TERMS.has(term) &&
+    !LOW_SIGNAL_TOKENS.has(term) &&
     !/^\d+$/.test(term) &&
     !/^(?:19|20)\d{2}$/.test(term) &&
     !/^(?:720p|1080p|2160p|web(?:rip|dl)|bluray|yts)$/i.test(term)
@@ -709,14 +721,18 @@ function clustersShareStrongAnchor(left, right) {
 
 function strongClusterAnchors(cluster) {
   const counts = new Map();
-  const minimumCount = cluster.profiles.length <= 1 ? 1 : Math.ceil(cluster.profiles.length * 0.6);
+  // A sparse follow-up needs one topic shared by the whole group, not a
+  // publisher name or an anchor belonging only to its majority.
+  const minimumCount = cluster.profiles.length;
 
-  for (const profile of cluster.profiles) {
+  for (const [index, profile] of cluster.profiles.entries()) {
+    const publisher = cluster.articles[index].sourceName || "";
+    const publisherTerms = new Set(tokenList(`${publisher} ${publisher.replace(/\s+/g, "")}`));
     for (const feature of profile.signals) {
       if (!feature.startsWith("t:")) continue;
 
       const term = feature.slice(2);
-      if (isStrongAnchorTerm(term)) counts.set(term, (counts.get(term) || 0) + 1);
+      if (isStrongAnchorTerm(term) && !publisherTerms.has(term)) counts.set(term, (counts.get(term) || 0) + 1);
     }
   }
 
@@ -727,8 +743,9 @@ function isStrongAnchorTerm(term) {
   return isSignalToken(term) && term.length >= 5;
 }
 
-function termSignals(signals) {
-  return new Set([...signals].filter((feature) => feature.startsWith("t:")));
+function sharedTerms(a, b) {
+  // A pair of terms and its derived phrase are two signals, not three.
+  return new Set([...a].filter((feature) => feature.startsWith("t:") && b.has(feature)));
 }
 
 function cosine(a, b) {

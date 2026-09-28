@@ -45,7 +45,7 @@ Provide both `--start` and `--end`, or neither. Datetimes without an offset use 
 Generated files are written to the ignored `out/` directory:
 
 - `digest-YYYY-MM-DD.html`: rendered email.
-- `digest-YYYY-MM-DD.json`: window, topics, article and cluster counts, AI-call and AI-failure counts, ordinary feed failures, and separately recorded disabled or unavailable generated feeds. AI failures retain source excerpts rather than removing the story.
+- `digest-YYYY-MM-DD.json`: window, topics, article and cluster counts, AI-call/retry/failure counts, summary coverage by reason, ordinary feed failures, and separately recorded disabled or unavailable generated feeds. Missing summaries retain headlines and source links. See [summary policy](feeds.md#summary-coverage).
 
 The filename date comes from the window's end date. Running another window ending on that date overwrites the same local output files.
 

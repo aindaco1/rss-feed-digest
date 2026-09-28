@@ -710,3 +710,73 @@ test("does not cluster YouTube videos through embeddings", () => {
     [1, 1]
   );
 });
+
+test("a publisher name cannot bridge unrelated coverage into a product announcement roundup", () => {
+  const rows = [
+    ["tablet", "Apple tablet code leak", "OrbitNews reporter Dana found Apple code confirming a tablet memory upgrade and a C1X modem. The leaked images show the tablet design.", "Orbit News"],
+    ["bridge", "Apple tablet, speaker and television code leak", "OrbitNews reporter Dana found images of a tablet, speaker and television in Apple code. Separately, iPhone users have reported cellular connectivity issues with their carrier.", "Other Wire"],
+    ["speaker", "Apple speaker design leaked", "OrbitNews reporter Dana found images of a speaker design in Apple code. The speaker has new colors.", "Orbit News"],
+    ["tv", "Apple television hardware leaked", "OrbitNews reporter Dana found images of television hardware in Apple code. The television supports improved networking.", "Orbit News"],
+    ["phone", "iPhone carrier cellular issues", "OrbitNews readers report iPhone cellular connectivity issues with their carrier. Calls and data fail; the cause is unclear.", "Orbit News"]
+  ].map(([id, title, summary, sourceName], i) => article({ id, title, summary, text: summary, sourceName,
+    publishedAt: new Date(Date.UTC(2026, 8, 25, 15, 50 - i * 10)).toISOString() }));
+  const context = Array.from({ length: 25 }, (_, i) => article({ id: `background-${i}`, title: `Unconnected bulletin ${i}`, topicHint: "Local" }));
+  const groups = clusterArticles([...rows, ...context], { env: {} }).filter(c => c.topicHint === "Tech")
+    .map(c => c.articles.map(a => a.id).sort()).sort((a, b) => a.join().localeCompare(b.join()));
+  assert.deepEqual(groups, [["bridge", "speaker", "tablet", "tv"], ["phone"]]);
+});
+
+test("generic wording cannot combine unrelated stories in a busy edition", () => {
+  const cases = [
+    [
+      { title: "Ubisoft Was Working on an Official Legend of Zelda Game, Report Says", summary: "Ubisoft was working on a Zelda spinoff at its Milan studio before Nintendo rejected the pitch. The proposed adventure never entered production." },
+      { title: "Beyond Good and Evil 2 Shows Surprising New Signs of Life", summary: "A Ubisoft writer says he has been working on Beyond Good and Evil 2 for two months. His update suggests the long-delayed science fiction sequel remains in development." }
+    ],
+    [
+      { title: "Apple Code Confirms iPad 12 Specs: A19, 8GB RAM, N1, C1X Modem", summary: "The next low-cost tablet is equipped with an A19 chip and C1X modem, according to code examined by a technology reporter. Some of these specifications appeared in earlier rumors. Support for local artificial intelligence requires more RAM than the current generation provides." },
+      { title: "Some iPhone 18 Pro Max Users Experiencing Cellular Issues", summary: "A subset of phone owners cannot connect to their cellular carrier for calls or data. They are seeking support after failed eSIM provisioning. These devices are equipped with a Qualcomm modem. Some owners abroad have a different component, but the cause is unclear." }
+    ],
+    [
+      { title: "The Technology Show: Photographer Discusses iPhone 18 Pro Camera", summary: "A photographer examines how the phone's adjustable aperture affects everyday shooting. The discussion covers practical tradeoffs for professional photographers, focal lengths and image processing. The iPhone 18 Pro's sensor offers more flexibility for portraits than its predecessor." },
+      { title: "iPad Mini Leaked: A20 Pro Chip, Landscape Camera, and More", summary: "Code from the manufacturer reveals a redesigned compact tablet. The iPad mini has an A20 Pro processor, a rearranged front camera and new speakers. Published images show only the front panel, leaving the rear design unknown. A groove in the glass provides room for a speaker." }
+    ],
+    [
+      { title: "U2 Play Their Old High School On 50th Anniversary Of Their Formation", sourceName: "Music Wire", summary: "The band returned to the school in Dublin where its members first rehearsed together. They performed a concert for students." },
+      { title: "Old-School Credit Card Scams Are Far From Dead", sourceName: "Tech Wire", summary: "In an era of increasingly sophisticated AI-fueled scams, a retro threat may be lurking in your mailbox." }
+    ],
+    [
+      { title: "Quince Luggage Is Affordable but Doesn’t Feel Cheap", sourceName: "Reviews", summary: "We tested its luggage and compared the price with other suitcases." },
+      { title: "Nippon Ichi Is Researching AI But Doesn’t Think It Will Make Development Faster", sourceName: "Games", summary: "The company wants tools that improve the quality of its games." }
+    ],
+    [
+      { title: "2011 Scorsese Classic Lost Millions, Then Went on to Sweep the Oscars", summary: "Hugo was one of the movies that went on to win awards despite massive losses." },
+      { title: "5 Movies That Survived Production Nightmares", summary: "These movies went through massive production difficulties. One involved a studio dispute." }
+    ],
+    [
+      { title: "Remi Wolf Releases a New Song", summary: "The musician's new music draws on rock influences. She says the song previews an album." },
+      { title: "Todd Rundgren Says Taylor Swift Ruined Music", summary: "The rock musician says he dislikes her songwriting and music." }
+    ],
+    [
+      { title: "Silver Lantern Announces New Album: Hear First Single", summary: "The band shares a new album and song due this fall." },
+      { title: "Velvet Meadow Announces New Album: Hear First Single", summary: "The singer shares a new album and song due this fall." }
+    ],
+    [
+      { title: "Administration risks freeing convicted criminals in international court dispute", sourceName: "Politics Wire", summary: "A scholar argued that the Trump administration risks weakening the International Criminal Court and freeing defendants." },
+      { title: "Appeals Court Lets Pentagon Designate Anthropic a Supply-Chain Risk", sourceName: "Tech Wire", summary: "The AI lab had argued multiple violations of its rights, but a divided panel of judges sided with the Trump administration." }
+    ],
+    [
+      { title: "Gaming’s biggest horror series are more vital than ever", sourceName: "Games Wire", summary: "Survival horror franchises return with a reboot and a new game." },
+      { title: "Lego’s biggest set ever is coming out soon", sourceName: "Culture Wire", summary: "The Sagrada Familia model has 12,060 pieces and costs $800." }
+    ],
+    [
+      { title: "Brandon Sanderson’s New Cosmere Book Gets Exclusive New Reveal", summary: "A reveal of Brandon Sanderson's next fantasy book explores new worlds and magic." },
+      { title: "Magic: The Gathering Designer Reveals the Unexpected Inspiration Behind Reality Fracture", summary: "The new Magic set introduces alternate versions of popular characters. Its designer reveals his inspiration." }
+    ]
+  ];
+  const context = Array.from({ length: 25 }, (_, i) => article({ id: `background-${i}`, title: `Unconnected bulletin ${i}`, topicHint: "Local" }));
+  for (const pair of cases) {
+    const rows = pair.map((a, i) => article({ id: `target-${i}`, ...a }));
+    const clusters = clusterArticles([...context, ...rows], { env: {} });
+    assert.ok(!clusters.some(c => c.articles.filter(a => a.id.startsWith("target-")).length > 1), pair.map(a => a.title).join(" / "));
+  }
+});
