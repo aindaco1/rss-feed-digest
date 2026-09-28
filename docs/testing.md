@@ -198,7 +198,7 @@ paragraph of at most 100 words. After one retry fails, a card keeps only its
 headline and source links. The earlier September 23 records above describe the
 previous excerpt fallback; they do not validate this policy.
 
-Local verification passes 128 tests, feed validation and the offline Jev
+Local verification passes 129 tests, feed validation and the offline Jev
 preview. New cases cover editions beyond 80 cards, explicit limits, invalid
 limits, oversized inputs, retry success/failure, paragraph/word limits,
 headline-only rendering, short-teaser limits, Atom inline text order and unrelated story matches.
@@ -221,6 +221,22 @@ the failure, and the existing RFK/raw-milk and other positive roundups still pas
 The user confirmed grouping by product or announcement rather than company.
 A further negative pair separates Ubisoft's Zelda project from Beyond Good and
 Evil 2; the generic verb `working` no longer supplies grouping evidence.
+
+The full hosted edition exposed a remaining publisher-name bridge that the small
+feed replay missed. Exact captured inputs reproduce it: the previous rule makes
+233 cards and folds cellular trouble into a device-leak roundup. Requiring a
+meaningful anchor across every cluster member, excluding publisher names, makes
+234 cards and separates that story while keeping the six related leak sources
+together. An invented five-article regression reproduces the publisher bridge;
+existing sparse same-event follow-ups still pass.
+
+For exact reproductions, dispatch Daily Digest with `capture_inputs=true`.
+It forces a dry run, skips summary generation and image hydration, and saves
+normalized article text, vectors and clustering settings in an ignored output
+artifact. Feed URLs, author details and provider metadata are omitted. This
+opt-in capture is never enabled for scheduled sends. The CLI equivalent is
+`--dry-run --capture-inputs --no-ai --no-og-images`. Treat the captured source
+text as diagnostic data; do not commit it as fixtures.
 
 ### Bounded comparison of summary models
 

@@ -711,6 +711,21 @@ test("does not cluster YouTube videos through embeddings", () => {
   );
 });
 
+test("a publisher name cannot bridge unrelated coverage into a product announcement roundup", () => {
+  const rows = [
+    ["tablet", "Apple tablet code leak", "OrbitNews reporter Dana found Apple code confirming a tablet memory upgrade and a C1X modem. The leaked images show the tablet design.", "Orbit News"],
+    ["bridge", "Apple tablet, speaker and television code leak", "OrbitNews reporter Dana found images of a tablet, speaker and television in Apple code. Separately, iPhone users have reported cellular connectivity issues with their carrier.", "Other Wire"],
+    ["speaker", "Apple speaker design leaked", "OrbitNews reporter Dana found images of a speaker design in Apple code. The speaker has new colors.", "Orbit News"],
+    ["tv", "Apple television hardware leaked", "OrbitNews reporter Dana found images of television hardware in Apple code. The television supports improved networking.", "Orbit News"],
+    ["phone", "iPhone carrier cellular issues", "OrbitNews readers report iPhone cellular connectivity issues with their carrier. Calls and data fail; the cause is unclear.", "Orbit News"]
+  ].map(([id, title, summary, sourceName], i) => article({ id, title, summary, text: summary, sourceName,
+    publishedAt: new Date(Date.UTC(2026, 8, 25, 15, 50 - i * 10)).toISOString() }));
+  const context = Array.from({ length: 25 }, (_, i) => article({ id: `background-${i}`, title: `Unconnected bulletin ${i}`, topicHint: "Local" }));
+  const groups = clusterArticles([...rows, ...context], { env: {} }).filter(c => c.topicHint === "Tech")
+    .map(c => c.articles.map(a => a.id).sort()).sort((a, b) => a.join().localeCompare(b.join()));
+  assert.deepEqual(groups, [["bridge", "speaker", "tablet", "tv"], ["phone"]]);
+});
+
 test("generic wording cannot combine unrelated stories in a busy edition", () => {
   const cases = [
     [

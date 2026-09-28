@@ -721,14 +721,18 @@ function clustersShareStrongAnchor(left, right) {
 
 function strongClusterAnchors(cluster) {
   const counts = new Map();
-  const minimumCount = cluster.profiles.length <= 1 ? 1 : Math.ceil(cluster.profiles.length * 0.6);
+  // A sparse follow-up needs one topic shared by the whole group, not a
+  // publisher name or an anchor belonging only to its majority.
+  const minimumCount = cluster.profiles.length;
 
-  for (const profile of cluster.profiles) {
+  for (const [index, profile] of cluster.profiles.entries()) {
+    const publisher = cluster.articles[index].sourceName || "";
+    const publisherTerms = new Set(tokenList(`${publisher} ${publisher.replace(/\s+/g, "")}`));
     for (const feature of profile.signals) {
       if (!feature.startsWith("t:")) continue;
 
       const term = feature.slice(2);
-      if (isStrongAnchorTerm(term)) counts.set(term, (counts.get(term) || 0) + 1);
+      if (isStrongAnchorTerm(term) && !publisherTerms.has(term)) counts.set(term, (counts.get(term) || 0) + 1);
     }
   }
 
