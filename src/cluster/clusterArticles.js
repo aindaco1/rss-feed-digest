@@ -1,7 +1,7 @@
 import { digestHash } from "../util/hash.js";
 
 const STOP_WORDS = new Set([
-  "but", "doesn", "don", "isn", "aren", "then", "there", "these", "those", "won", "would",
+  "but", "doesn", "don", "isn", "aren", "some", "then", "there", "these", "those", "won", "would",
   "a",
   "about",
   "above",
@@ -66,7 +66,7 @@ const STOP_WORDS = new Set([
 
 const LOW_SIGNAL_TERMS = new Set([
   "album", "already", "biggest", "ever", "exclusive", "film", "first", "got", "great", "hear", "music",
-  "old", "one", "release", "says", "share", "song", "thing", "time", "went",
+  "old", "one", "pro", "mini", "release", "says", "share", "song", "thing", "time", "went",
   "1hr",
   "allegedly",
   "announce",

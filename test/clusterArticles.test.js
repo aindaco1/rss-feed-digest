@@ -714,6 +714,14 @@ test("does not cluster YouTube videos through embeddings", () => {
 test("generic wording cannot combine unrelated stories in a busy edition", () => {
   const cases = [
     [
+      { title: "Apple Code Confirms iPad 12 Specs: A19, 8GB RAM, N1, C1X Modem", summary: "The next low-cost tablet is equipped with an A19 chip and C1X modem, according to code examined by a technology reporter. Some of these specifications appeared in earlier rumors. Support for local artificial intelligence requires more RAM than the current generation provides." },
+      { title: "Some iPhone 18 Pro Max Users Experiencing Cellular Issues", summary: "A subset of phone owners cannot connect to their cellular carrier for calls or data. They are seeking support after failed eSIM provisioning. These devices are equipped with a Qualcomm modem. Some owners abroad have a different component, but the cause is unclear." }
+    ],
+    [
+      { title: "The Technology Show: Photographer Discusses iPhone 18 Pro Camera", summary: "A photographer examines how the phone's adjustable aperture affects everyday shooting. The discussion covers practical tradeoffs for professional photographers, focal lengths and image processing. The iPhone 18 Pro's sensor offers more flexibility for portraits than its predecessor." },
+      { title: "iPad Mini Leaked: A20 Pro Chip, Landscape Camera, and More", summary: "Code from the manufacturer reveals a redesigned compact tablet. The iPad mini has an A20 Pro processor, a rearranged front camera and new speakers. Published images show only the front panel, leaving the rear design unknown. A groove in the glass provides room for a speaker." }
+    ],
+    [
       { title: "U2 Play Their Old High School On 50th Anniversary Of Their Formation", sourceName: "Music Wire", summary: "The band returned to the school in Dublin where its members first rehearsed together. They performed a concert for students." },
       { title: "Old-School Credit Card Scams Are Far From Dead", sourceName: "Tech Wire", summary: "In an era of increasingly sophisticated AI-fueled scams, a retro threat may be lurking in your mailbox." }
     ],

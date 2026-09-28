@@ -213,6 +213,12 @@ local evidence, not committed fixtures. They were re-fetched after the scheduled
 run; original production inputs and embeddings were not retained. This replay
 does not establish fresh AI quality or email-client acceptance.
 
+A further replay of 13 MacRumors/Verge feed articles found an Apple roundup
+bridged through the generic words `some`, `Pro` and `mini`. Excluding those from
+match evidence separates cellular trouble and camera coverage from device leaks
+while retaining the related leak roundup. Two additional negative pairs cover
+the failure, and the existing RFK/raw-milk and other positive roundups still pass.
+
 ### Bounded comparison of summary models
 
 `node scripts/compare-summaries.js --input=/path/to/cases.json` validates and
