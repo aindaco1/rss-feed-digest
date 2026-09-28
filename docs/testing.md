@@ -238,6 +238,30 @@ opt-in capture is never enabled for scheduled sends. The CLI equivalent is
 `--dry-run --capture-inputs --no-ai --no-og-images`. Treat the captured source
 text as diagnostic data; do not commit it as fixtures.
 
+### Final hosted preview
+
+The [final September 26-window preview](https://github.com/aindaco1/rss-feed-digest/actions/runs/36361617916)
+ran revision `6870ab3a3529b83b7b946c0741adec00b4a4578a` with GPT-5.4 mini:
+263 articles became 234 cards, all with generated summaries. There were 235 AI
+calls, one successful retry, zero exhausted summaries and zero feed failures;
+the previously disabled Okayplayer feed remained separately recorded as skipped.
+The longest summary was 96 words. Checks confirmed one paragraph per summary,
+all 263 source links and complete summary text in HTML and derived email text.
+Raw Story had 5/5 summarized cards, Jacobin 6/6, and No Film School 12/12.
+
+The reviewed output keeps U2 separate from credit-card scams, cellular problems
+separate from the six-source Apple code-leak roundup, and Ubisoft's Zelda report
+separate from Beyond Good and Evil 2. The Lego summary omits the figurative
+assembly-time claim. These selected semantic checks do not grade every summary
+in the edition. Summaries remain limited to supplied feed text, which can be a
+teaser or a body capped at 6,000 characters.
+
+The [same-revision CI run](https://github.com/aindaco1/rss-feed-digest/actions/runs/36361620085)
+passed all 129 tests, static validation of 52 feeds / 13 topics, and the offline
+Jev preview. No email was sent during this preview. The repository model variable
+was set to `gpt-5.4-mini` after user approval; delivery and received-email rendering
+remain separate from these generation and artifact checks.
+
 ### Bounded comparison of summary models
 
 `node scripts/compare-summaries.js --input=/path/to/cases.json` validates and
