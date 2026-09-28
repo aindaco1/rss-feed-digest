@@ -218,6 +218,9 @@ bridged through the generic words `some`, `Pro` and `mini`. Excluding those from
 match evidence separates cellular trouble and camera coverage from device leaks
 while retaining the related leak roundup. Two additional negative pairs cover
 the failure, and the existing RFK/raw-milk and other positive roundups still pass.
+The user confirmed grouping by product or announcement rather than company.
+A further negative pair separates Ubisoft's Zelda project from Beyond Good and
+Evil 2; the generic verb `working` no longer supplies grouping evidence.
 
 ### Bounded comparison of summary models
 

@@ -150,6 +150,7 @@ const LOW_SIGNAL_TERMS = new Set([
   "watt",
   "weekend",
   "work",
+  "working",
   "year",
   "january",
   "february",

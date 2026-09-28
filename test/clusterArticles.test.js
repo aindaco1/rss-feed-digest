@@ -714,6 +714,10 @@ test("does not cluster YouTube videos through embeddings", () => {
 test("generic wording cannot combine unrelated stories in a busy edition", () => {
   const cases = [
     [
+      { title: "Ubisoft Was Working on an Official Legend of Zelda Game, Report Says", summary: "Ubisoft was working on a Zelda spinoff at its Milan studio before Nintendo rejected the pitch. The proposed adventure never entered production." },
+      { title: "Beyond Good and Evil 2 Shows Surprising New Signs of Life", summary: "A Ubisoft writer says he has been working on Beyond Good and Evil 2 for two months. His update suggests the long-delayed science fiction sequel remains in development." }
+    ],
+    [
       { title: "Apple Code Confirms iPad 12 Specs: A19, 8GB RAM, N1, C1X Modem", summary: "The next low-cost tablet is equipped with an A19 chip and C1X modem, according to code examined by a technology reporter. Some of these specifications appeared in earlier rumors. Support for local artificial intelligence requires more RAM than the current generation provides." },
       { title: "Some iPhone 18 Pro Max Users Experiencing Cellular Issues", summary: "A subset of phone owners cannot connect to their cellular carrier for calls or data. They are seeking support after failed eSIM provisioning. These devices are equipped with a Qualcomm modem. Some owners abroad have a different component, but the cause is unclear." }
     ],
