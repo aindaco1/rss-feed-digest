@@ -22,7 +22,7 @@ npm run digest -- --dry-run --no-ai --no-embeddings
 
 This fetches live feeds and writes HTML and JSON to `out/`. See [operations](docs/operations.md) for credentials, historical windows, output details, and sending.
 
-With OpenAI enabled, every card is summarized by default in one paragraph of at most 100 words. Without AI, or after a failed retry, cards retain their headline and source links without a copied excerpt.
+With OpenAI enabled, every card is summarized by default in one paragraph of at most 100 words. Single-article cards keep their original source title; only combined cards get generated headlines. Without AI, or after a failed retry, cards retain their headline and source links without a copied excerpt.
 
 For a sample layout with fixture content:
 
