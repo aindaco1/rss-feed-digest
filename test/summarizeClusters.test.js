@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as cheerio from "cheerio/slim";
 import { parseSummaryResponse, summarizeClusters } from "../src/ai/summarizeClusters.js";
+import { renderDigestEmail } from "../src/email/renderDigestEmail.js";
+import { htmlToText } from "../src/util/html.js";
 
 test("uses medium text verbosity for gpt-4.1-mini AI summaries", async () => {
   let request = null;
@@ -155,6 +158,35 @@ function singleClusters(count) {
   ] }));
 }
 
+test("single-article cards retain the source title alongside AI body summaries in JSON and email", async () => {
+  const cluster = singleClusters(1)[0];
+  const title = "Aster & Co.’s “invite-only” beta: what changes today?";
+  cluster.articles[0].title = title;
+  const generated = JSON.parse(response().output_text);
+  assert.notEqual(generated.headline, title);
+
+  const digest = await summarizeClusters([cluster], { topics: ["Tech"] }, {
+    env: {}, apiKey: "test", client: { responses: { create: async () => response() } }
+  });
+  const card = digest.articles[0];
+  assert.equal(card.headline, title);
+  assert.equal(card.sources[0].title, title);
+  assert.equal(card.summary, generated.summary);
+  assert.equal(card.summaryKind, "ai");
+  assert.equal(digest.aiCalls, 1);
+  assert.equal(digest.aiFailures, 0);
+
+  const html = renderDigestEmail({ dateLabel: "06/01/2026", topics: digest.topics });
+  const $ = cheerio.load(html);
+  assert.equal($("article h2 a").text(), title);
+  assert.equal($("article h2 a").attr("href"), cluster.articles[0].url);
+  assert.ok($("article").text().includes(generated.summary));
+  const text = htmlToText(html, { email: true });
+  assert.ok(text.includes(title));
+  assert.ok(text.includes(generated.summary));
+  assert.ok(!text.includes(generated.headline));
+});
+
 test("summarizes single articles throughout editions larger than the old 80-card limit", async () => {
   const digest = await summarizeClusters(singleClusters(203), { topics: ["Tech"] }, {
     env: {}, apiKey: "test", client: { responses: { create: async () => response() } }
@@ -207,6 +239,7 @@ test("retries rejected summaries once and uses the complete corrected response",
   assert.equal(digest.aiCalls, 2);
   assert.equal(digest.aiRetries, 1);
   assert.equal(digest.aiFailures, 0);
+  assert.equal(digest.articles[0].headline, "Article 0");
   assert.equal(digest.articles[0].summary, JSON.parse(response().output_text).summary);
 });
 
