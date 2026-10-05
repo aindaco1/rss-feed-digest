@@ -12,7 +12,7 @@ const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)";
 const BROWSER_FALLBACK_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
-const RETRYABLE_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504]);
+const RETRYABLE_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504, 521]);
 
 const parser = new Parser({
   customFields: {

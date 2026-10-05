@@ -43,6 +43,36 @@ test("retries retryable feed failures", async () => {
   assert.match(xml, /<rss>/);
 });
 
+test("recovers from a temporary Cloudflare origin failure", async () => {
+  let calls = 0;
+  const xml = await fetchFeedXml("https://example.com/feed", {
+    attempts: 4,
+    retryBaseDelayMs: 0,
+    retryJitterMs: 0,
+    env: {},
+    fetchImpl: async () => ++calls < 3
+      ? new Response("Web server is down", { status: 521 })
+      : new Response("<rss></rss>")
+  });
+  assert.equal(calls, 3);
+  assert.equal(xml, "<rss></rss>");
+});
+
+test("bounds Cloudflare retries and still reports a persistent failure", async () => {
+  let calls = 0;
+  await assert.rejects(fetchFeedXml("https://example.com/feed", {
+    attempts: 4,
+    retryBaseDelayMs: 0,
+    retryJitterMs: 0,
+    env: {},
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response("Web server is down", { status: 521 });
+    }
+  }), /Status code 521/);
+  assert.equal(calls, 4);
+});
+
 test("skips unavailable generated subscription feeds without hiding static feed failures", async () => {
   const window = {
     start: new Date("2026-08-13T13:00:00.000Z"),

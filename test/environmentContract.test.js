@@ -80,9 +80,8 @@ test("keeps scheduled-workflow defaults aligned with the environment example", (
   assert.deepEqual(mismatches, []);
 });
 
-test("schedules the daily digest off minute zero in the Denver timezone", () => {
-  assert.match(workflow, /- cron: "17 7 \* \* \*"\s+timezone: "America\/Denver"/);
-  assert.doesNotMatch(workflow, /- cron: "0 /);
+test("schedules the daily digest at 7 AM Mountain time with daylight-saving support", () => {
+  assert.match(workflow, /- cron: "0 7 \* \* \*"\s+timezone: "America\/Denver"/);
 });
 
 test("keeps digest artifacts only for the recent diagnostic window", () => {

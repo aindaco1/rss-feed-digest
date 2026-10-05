@@ -53,7 +53,7 @@ Send runs stop before contacting Resend when ordinary feed failures are present.
 
 ## GitHub Actions
 
-[Daily Digest](../.github/workflows/daily-digest.yml) is configured for 7:17 AM America/Denver each day, after the 7:00 AM digest cutoff. Its explicit timezone follows daylight-saving changes. Minute 17 avoids the start-of-hour peak, but scheduled runs can still be delayed or dropped under high load. See [GitHub's scheduling documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+[Daily Digest](../.github/workflows/daily-digest.yml) targets 7:00 AM America/Denver each day, at the digest cutoff. Its explicit timezone follows daylight-saving changes. This is the requested workflow start time; feed fetching and summary generation normally add a few minutes before sending. GitHub scheduling is best-effort and can delay or drop runs, especially at the start of an hour. Recent runs have been dispatched several hours late, so this schedule does not guarantee a 7 AM inbox arrival. A punctual delivery requirement needs an independent hosted scheduler. See [GitHub's scheduling documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 
 Optional repository variables and their defaults live under **Optional scheduled-workflow variables** in [`.env.example`](../.env.example). The [contract tests](../test/environmentContract.test.js) verify that the workflow forwards every supported scheduled variable and uses the documented defaults.
 

@@ -2,9 +2,9 @@ name: Daily Digest
 
 on:
   schedule:
-    # Avoid minute zero, when GitHub documents the highest scheduled-workflow load.
-    # The explicit timezone removes the need for duplicate DST-aware UTC schedules.
-    - cron: "17 7 * * *"
+    # Target 7 AM Mountain time year-round. GitHub dispatch is best-effort;
+    # feed fetching and summary generation add a few minutes after job start.
+    - cron: "0 7 * * *"
       timezone: "America/Denver"
   workflow_dispatch:
     inputs:

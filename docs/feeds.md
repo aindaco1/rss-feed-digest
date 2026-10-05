@@ -31,7 +31,7 @@ Validation checks static configuration locally. The audit makes network requests
 
 ## Fetching and backfills
 
-The scheduled workflow uses `FEED_CONCURRENCY=2`, `FEED_FETCH_ATTEMPTS=4`, and `FEED_FETCH_TIMEOUT_MS=30000` to accommodate large feeds and transient throttling. All scheduled defaults are maintained in [`.env.example`](../.env.example).
+The scheduled workflow uses `FEED_CONCURRENCY=2`, `FEED_FETCH_ATTEMPTS=4`, and `FEED_FETCH_TIMEOUT_MS=30000` to accommodate large feeds and transient throttling. Cloudflare HTTP 521 origin failures use the same bounded retries before attempting the existing fallbacks. All scheduled defaults are maintained in [`.env.example`](../.env.example).
 
 If Substack blocks `/feed`, the fetcher tries the publication's public `/api/v1/archive` endpoint, then Feedbin's cached entries for the matching subscription when credentials are available. `SUBSTACK_ARCHIVE_LIMIT` controls the archive page size; `FEEDBIN_PER_PAGE` controls Feedbin page size.
 
