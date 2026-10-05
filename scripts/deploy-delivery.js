@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { createStateClient } from "../src/digest/stateClient.js";
 
 const target = process.env.DELIVERY_TARGET;
@@ -48,9 +49,16 @@ try {
   await rm(dir, { recursive: true, force: true });
 }
 
-const unauthorized = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-await unauthorized.body?.cancel();
-assert.equal(unauthorized.status, 401, "Worker must reject unauthenticated access");
+// A newly created workers.dev route may return 404 briefly after upload succeeds.
+let status;
+for (let attempt = 0; attempt < 6; attempt++) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  status = response.status;
+  await response.body?.cancel();
+  if (status !== 404 && status < 500) break;
+  if (attempt < 5) await delay(5_000);
+}
+assert.equal(status, 401, "Worker must become available and reject unauthenticated access");
 const state = createStateClient({ ...process.env, DIGEST_STATE_URL: url });
 const key = `daily-digest/deploy-${Date.now()}`;
 const owner = randomUUID();
