@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   LOCAL_ONLY_VARIABLES,
+  OPTIONAL_CREDENTIALS,
   OVERCAST_OPML_SOURCES,
   REQUIRED_FOR_SEND,
   REQUIRED_FOR_YOUTUBE_SYNC,
@@ -51,7 +52,8 @@ test("documents every supported environment variable in the example file", () =>
     ...REQUIRED_FOR_YOUTUBE_SYNC,
     ...OVERCAST_OPML_SOURCES,
     ...WORKFLOW_VARIABLES,
-    ...LOCAL_ONLY_VARIABLES
+    ...LOCAL_ONLY_VARIABLES,
+    ...OPTIONAL_CREDENTIALS
   ];
 
   assert.deepEqual(
@@ -99,6 +101,6 @@ test("requires optional sync credentials only when their blocking mode is enable
       YOUTUBE_SYNC_REQUIRED: "true",
       OVERCAST_SYNC_SUBSCRIPTIONS: "true"
     }).missing,
-    [...REQUIRED_FOR_YOUTUBE_SYNC, "one Overcast OPML source"]
+    [...REQUIRED_FOR_YOUTUBE_SYNC]
   );
 });

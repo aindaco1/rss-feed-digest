@@ -9,3 +9,6 @@ config/podcast-subscriptions.json
 config/*.opml
 config/*.opml.b64
 !config/*.opml.gpg
+
+.wrangler/
+.dev.vars*

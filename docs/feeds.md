@@ -27,11 +27,11 @@ npm run validate:feeds
 npm run audit:feeds
 ```
 
-Validation checks static configuration locally. The audit makes network requests to active feeds and reports errors or HTML responses where RSS/Atom was expected. Disabled feeds are skipped. Generated YouTube and podcast feeds returning 404/410 are also skipped under their default availability policy; failures from static feeds remain fatal. See [subscription settings](subscriptions.md) for availability overrides.
+Validation checks static configuration locally. The audit makes network requests to active feeds and reports errors or HTML responses where RSS/Atom was expected. Disabled feeds are skipped. Generated YouTube and podcast feeds returning 404/410 are also skipped under their default availability policy; failures from static feeds are included in the partial-coverage gate and missing-source notice. See [subscription settings](subscriptions.md) for availability overrides.
 
 ## Fetching and backfills
 
-The scheduled workflow uses `FEED_CONCURRENCY=2`, `FEED_FETCH_ATTEMPTS=4`, and `FEED_FETCH_TIMEOUT_MS=30000` to accommodate large feeds and transient throttling. Cloudflare HTTP 521 origin failures use the same bounded retries before attempting the existing fallbacks. All scheduled defaults are maintained in [`.env.example`](../.env.example).
+The scheduled workflow uses `FEED_CONCURRENCY=2`, `FEED_FETCH_ATTEMPTS=4`, and `FEED_FETCH_TIMEOUT_MS=30000` to accommodate large feeds and transient throttling. Temporary 5xx responses, including Cloudflare 521/522/524, use bounded retries before the existing fallbacks. Collection has an overall three-minute budget. All scheduled defaults are maintained in [`.env.example`](../.env.example).
 
 If Substack blocks `/feed`, the fetcher tries the publication's public `/api/v1/archive` endpoint, then Feedbin's cached entries for the matching subscription when credentials are available. `SUBSTACK_ARCHIVE_LIMIT` controls the archive page size; `FEEDBIN_PER_PAGE` controls Feedbin page size.
 

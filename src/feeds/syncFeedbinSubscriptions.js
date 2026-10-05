@@ -1,3 +1,5 @@
+import { readBoundedText } from "@dustwave/worker-core/response-body";
+import { retryableStatus } from "../util/network.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { discardResponseBody } from "../util/fetch.js";
 import { isDirectRun } from "../util/modules.js";
@@ -5,7 +7,6 @@ import { feedbinApiUrl, feedbinAuthorization } from "./feedbin.js";
 
 const DEFAULT_ATTEMPTS = 4;
 const DEFAULT_TIMEOUT_MS = 30000;
-const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export async function syncFeedbinSubscriptions(options = {}) {
   const env = options.env || process.env;
@@ -134,8 +135,11 @@ async function feedbinFetch(path, requestOptions, options) {
         }
       });
 
-      if (!RETRYABLE_STATUSES.has(response.status) || attempt >= attempts) {
-        return response;
+      if (!retryableStatus(response.status) || attempt >= attempts) {
+        const body = await readBoundedText(response, 5_000_000);
+        // Consume the body while the timeout is still active. The caller can
+        // then interpret Feedbin's 201/300/302 statuses without another stream.
+        return { ok: response.ok, status: response.status, json: async () => JSON.parse(body) };
       }
 
       await discardResponseBody(response);

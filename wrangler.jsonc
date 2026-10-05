@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rss-digest-delivery",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-05",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "durable_objects": { "bindings": [{ "name": "DIGEST_STATE", "class_name": "DigestState" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DigestState"] }],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "GITHUB_REPOSITORY": "aindaco1/rss-feed-digest",
+    "GITHUB_REF": "main",
+    "START_DATE": ""
+  }
+}

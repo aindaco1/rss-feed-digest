@@ -9,15 +9,17 @@ Use [`.env.example`](../.env.example) for supported settings and defaults. Scrip
 Export the following values locally, or add them as repository secrets under **Settings → Secrets and variables → Actions** for scheduled sends:
 
 ```bash
-export OPENAI_API_KEY=...
-export RESEND_API_KEY=...
+export DIGEST_STATE_URL=https://your-private-delivery-worker.workers.dev
+export DIGEST_STATE_TOKEN=...
 export DIGEST_FROM_EMAIL="Alonso's Daily Digest <digest@example.com>"
 export DIGEST_TO_EMAIL="alonso@example.com"
+# Optional enrichment/fallback providers:
+export OPENAI_API_KEY=...
 export FEEDBIN_EMAIL=...
 export FEEDBIN_PASSWORD=...
 ```
 
-Check the send environment, then send:
+Provision the private delivery Worker using the [cutover runbook](resilience.md#provisioning-and-cutover) before sending. Then check the send environment and send:
 
 ```bash
 npm run check:env
@@ -38,7 +40,7 @@ node src/digest/runDigest.js --start 2026-05-30T07:00:00 --end 2026-06-01T07:00:
 
 `npm run digest:test` is a live-feed dry-run for the fixed historical window from May 30, 2026 at 7:00 AM through June 1, 2026 at 7:00 AM America/Denver. It is separate from the offline test suite (`npm test`); old items may no longer be available from rolling feeds.
 
-Provide both `--start` and `--end`, or neither. Datetimes without an offset use the timezone in [`config/feeds.json`](../config/feeds.json), currently `America/Denver`. Without explicit dates, the digest uses the 24 hours ending at the most recent configured cutoff, currently 7:00 AM. Historical windows can use [Feedbin backfills](feeds.md#fetching-and-backfills).
+Provide both `--start` and `--end`, or neither. Datetimes without an offset use the timezone in [`config/feeds.json`](../config/feeds.json), currently `America/Denver`. Without explicit dates, the digest uses adjacent local calendar days ending at the most recent configured cutoff, currently 7:00 AM (23/25 hours at DST changes). Historical windows can use [Feedbin backfills](feeds.md#fetching-and-backfills).
 
 ## Outputs and failed feeds
 
@@ -49,21 +51,21 @@ Generated files are written to the ignored `out/` directory:
 
 The filename date comes from the window's end date. Running another window ending on that date overwrites the same local output files.
 
-Send runs stop before contacting Resend when ordinary feed failures are present. Inspect the JSON artifact and use the [feed audit](feeds.md#validation-and-audits) to investigate. To deliberately send an incomplete digest, set `ALLOW_PARTIAL_DIGEST_SEND=true` or pass `--allow-feed-failures` with `--send`.
+Useful partial editions now send with a notice naming missing sources. At least half of active feeds must load and a partial edition must contain articles; widespread outages are held. Set `ALLOW_PARTIAL_DIGEST_SEND=false` for strict ordinary-feed handling. See the [failure policy](resilience.md#failure-policy) for optional providers and recovery.
 
 ## GitHub Actions
 
-[Daily Digest](../.github/workflows/daily-digest.yml) targets 7:00 AM America/Denver each day, at the digest cutoff. Its explicit timezone follows daylight-saving changes. This is the requested workflow start time; feed fetching and summary generation normally add a few minutes before sending. GitHub scheduling is best-effort and can delay or drop runs, especially at the start of an hour. Recent runs have been dispatched several hours late, so this schedule does not guarantee a 7 AM inbox arrival. A punctual delivery requirement needs an independent hosted scheduler. See [GitHub's scheduling documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+[Daily Digest](../.github/workflows/daily-digest.yml) targets 7:00 AM America/Denver each day, at the digest cutoff. Its explicit timezone follows daylight-saving changes. This is the requested workflow start time; feed fetching and summary generation normally add a few minutes before sending. GitHub scheduling is best-effort and can delay or drop runs, especially at the start of an hour. Recent runs have been dispatched several hours late, so this schedule does not guarantee a 7 AM inbox arrival. The [delivery Worker](resilience.md#independent-scheduling-and-monitoring) provides an independent trigger, deadline checks and recovery for saved editions. See [GitHub's scheduling documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 
 Optional repository variables and their defaults live under **Optional scheduled-workflow variables** in [`.env.example`](../.env.example). The [contract tests](../test/environmentContract.test.js) verify that the workflow forwards every supported scheduled variable and uses the documented defaults.
 
-The workflow installs dependencies, runs [offline quality checks](testing.md), prepares enabled subscription sources, and builds the digest. Feedbin sync runs only before sends; enabled Overcast and YouTube sync also run for workflow dry-runs. See [subscriptions](subscriptions.md) for setup and the current YouTube required-sync limitation.
+The workflow installs dependencies, runs [offline quality checks](testing.md), prepares enabled subscription sources, and builds the digest. Feedbin sync runs only before sends; enabled Overcast and YouTube sync also run for workflow dry-runs. See [subscriptions](subscriptions.md) for setup and cache behavior.
 
 For a manual preview or backfill, open **Actions → Daily Digest → Run workflow** and keep `dry_run` checked. Supply both dates for a custom window, or select `test_window` for the fixed historical window. Unchecking `dry_run` requests a send. Generated HTML and JSON are uploaded as `digest-output` and retained for seven days when available, including after a send is blocked by feed failures.
 
 ## Deployment and local upkeep
 
-Production runs from `main` through Daily Digest. Merge a reviewed change with its
+Production generation runs from `main` through Daily Digest, with durable delivery in the Worker. Follow the [cutover runbook](resilience.md#provisioning-and-cutover) before enabling this version. Merge a reviewed change with its
 immutable Platform gitlink and lockfile, then verify the Test workflow on the
 merged revision. Test runs `npm run check` without credentials or inference.
 Dispatch Daily Digest on `main` with `dry_run=true` to verify hosted subscription
@@ -90,7 +92,7 @@ with unmerged work.
 
 Before retrying a delayed or failed run, inspect its logs and output artifact. Local artifacts show what was generated; confirm the send result separately.
 
-The [email sender](../src/email/sendDigestEmail.js) uses `daily-digest/YYYY-MM-DD` as its Resend idempotency key, based on the window's end date. Different windows ending on the same date therefore share a key. Resend retains keys for 24 hours: an identical retry returns the earlier result, while a changed payload with the same key is rejected. After that retention period, a retry can send again. See [Resend's idempotency rules](https://resend.com/docs/dashboard/emails/idempotency-keys).
+The private delivery service freezes the complete envelope before the first attempt and stores the provider receipt. Daily windows share one key, while nonstandard windows include a window hash. Retries resume the saved email; accepted editions never regenerate or resend. See [frozen editions and recovery](resilience.md#frozen-editions-and-recovery) for status inspection and safe reconciliation.
 
 ## Email delivery defaults
 

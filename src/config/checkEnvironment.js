@@ -27,7 +27,7 @@ if (youtubeSyncEnabled) {
 }
 
 if (overcastSyncEnabled) {
-  console.log("\nRequired for Overcast subscription sync:");
+  console.log("\nOptional for Overcast subscription refresh (cached subscriptions may be used):");
   for (const name of OVERCAST_OPML_SOURCES) {
     console.log(`- ${name}: ${process.env[name] ? "set" : "missing"}`);
   }

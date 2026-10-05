@@ -1,3 +1,4 @@
+import { fetchText } from "../util/network.js";
 import { isDirectRun } from "../util/modules.js";
 import {
   filterUnavailableGeneratedFeeds,
@@ -21,7 +22,8 @@ export async function syncYouTubeSubscriptions(options = {}) {
   const accessToken = await refreshAccessToken(credentials, fetchImpl);
   const subscriptions = await fetchAllSubscriptions(accessToken, {
     fetchImpl,
-    maxSubscriptions
+    maxSubscriptions,
+    deadline: Date.now() + 30_000
   });
   const feeds = youtubeSubscriptionItemsToFeeds(subscriptions, { topic });
   const { activeFeeds, skippedFeeds } =
@@ -76,7 +78,7 @@ export function youtubeSubscriptionItemsToFeeds(items, options = {}) {
 }
 
 async function refreshAccessToken(credentials, fetchImpl) {
-  const response = await fetchImpl(TOKEN_URL, {
+  const { response, text } = await fetchText(TOKEN_URL, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded"
@@ -87,9 +89,9 @@ async function refreshAccessToken(credentials, fetchImpl) {
       refresh_token: credentials.YOUTUBE_REFRESH_TOKEN,
       grant_type: "refresh_token"
     })
-  });
+  }, { fetchImpl });
 
-  const payload = await response.json().catch(() => ({}));
+  const payload = JSON.parse(text);
   if (!response.ok) {
     throw new Error(`YouTube token refresh failed: ${payload.error_description || payload.error || response.status}`);
   }
@@ -114,13 +116,13 @@ async function fetchAllSubscriptions(accessToken, options = {}) {
     url.searchParams.set("maxResults", "50");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
-    const response = await fetchImpl(url, {
+    const { response, text } = await fetchText(url, {
       headers: {
         accept: "application/json",
         authorization: `Bearer ${accessToken}`
       }
-    });
-    const payload = await response.json().catch(() => ({}));
+    }, { fetchImpl, deadline: options.deadline });
+    const payload = JSON.parse(text);
 
     if (!response.ok) {
       throw new Error(`YouTube subscriptions fetch failed: ${payload.error?.message || response.status}`);
