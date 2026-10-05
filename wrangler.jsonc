@@ -4,7 +4,7 @@
   "main": "worker/index.js",
   "compatibility_date": "2026-10-05",
   "workers_dev": true,
-  "observability": { "enabled": true },
+  "observability": { "enabled": true, "issues": { "enabled": true } },
   "durable_objects": { "bindings": [{ "name": "DIGEST_STATE", "class_name": "DigestState" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DigestState"] }],
   "triggers": { "crons": ["*/15 * * * *"] },
