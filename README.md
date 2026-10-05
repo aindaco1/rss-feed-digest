@@ -22,7 +22,7 @@ npm run digest -- --dry-run --no-ai --no-embeddings
 
 This fetches live feeds and writes HTML and JSON to `out/`. See [operations](docs/operations.md) for credentials, historical windows, output details, and sending.
 
-With OpenAI enabled, every card is summarized by default in one paragraph of at most 100 words. Single-article cards keep their original source title; only combined cards get generated headlines. Without AI, or after a failed retry, cards retain their headline and source links without a copied excerpt.
+With OpenAI enabled, every card is summarized by default in one paragraph of at most 100 words. Single-article cards keep their original source title; only combined cards get generated headlines. Within the generation budget, AI enrichment is attempted for every eligible card. Without AI, after a failed retry, or when its deadline expires, cards retain their headline and source links without a copied excerpt.
 
 For a sample layout with fixture content:
 
@@ -37,6 +37,7 @@ Open `out/sample-digest.html` to inspect the email layout.
 | Guide | Contents |
 | --- | --- |
 | [Operations](docs/operations.md) | Environment setup, CLI usage, sending, GitHub Actions, and recovery |
+| [Delivery resilience](docs/resilience.md) | Failure policy, private delivery state, independent monitoring, cutover and reconciliation |
 | [Feeds](docs/feeds.md) | Feed configuration, audits, fallbacks, filtering, and clustering |
 | [Subscriptions](docs/subscriptions.md) | Feedbin sync, YouTube OAuth, Overcast OPML, and app links |
 | [Testing and evaluation](docs/testing.md) | Offline quality checks, synthetic Jev evaluation, evidence, and Platform pin |

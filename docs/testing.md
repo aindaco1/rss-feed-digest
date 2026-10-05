@@ -293,3 +293,7 @@ The new Jev fidelity controls have passed offline simulation only. Live grading
 is pending refreshed Cloudflare credentials and a selected account. Jev remains
 advisory: it neither writes summaries nor changes runtime acceptance. Its shared
 Platform adapter and dependency pin are unchanged.
+
+## Delivery resilience tests
+
+`npm test` builds the delivery Worker with `wrangler deploy --dry-run` and exercises real local workerd/SQLite persistence with all outbound requests intercepted. Deterministic failure tests cover feed/provider outages, budgets, partial notices, subscription cache policy, durable recovery and DST. See [delivery resilience](resilience.md#verification). This adds no inference or email calls.

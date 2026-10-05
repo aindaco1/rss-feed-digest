@@ -1,3 +1,4 @@
+import { requestTimeout } from "../util/network.js";
 import OpenAI from "openai";
 import { isEmbeddingCandidate } from "../cluster/clusterArticles.js";
 
@@ -13,13 +14,14 @@ export async function embedArticles(articles, options = {}) {
   const client = options.client || new OpenAI({ apiKey });
   const vectorsById = new Map();
 
+  const deadline = options.deadline ?? Date.now() + 30_000;
   let dimensions;
   for (let index = 0; index < candidates.length; index += batchSize) {
     const batch = candidates.slice(index, index + batchSize);
     const response = await client.embeddings.create({
       model,
       input: batch.map((article) => `${article.title}\n${article.summary}\n${article.text.slice(0, 1500)}`)
-    });
+    }, { maxRetries: 0, timeout: requestTimeout(20_000, deadline), signal: AbortSignal.timeout(Math.ceil(requestTimeout(20_000, deadline))) });
 
     if (!Array.isArray(response.data) || response.data.length !== batch.length) throw new Error("Incomplete embedding response");
     const seen = new Set();

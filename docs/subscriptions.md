@@ -4,7 +4,7 @@ For connecting Feedbin, YouTube, and Overcast. Run commands from the repository 
 
 ## Feedbin
 
-Before send runs, the workflow runs `npm run feedbin:sync` to create missing subscriptions for active Substack feeds, titles in the comma-separated `FEEDBIN_SYNC_EXTRA_TITLES` list (default `Joblo`), and feeds with `feedbinSync: true`. It uses `FEEDBIN_EMAIL` and `FEEDBIN_PASSWORD`. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable the workflow step.
+Before send generation, bounded optional maintenance runs `npm run feedbin:sync` to create missing subscriptions for active Substack feeds, titles in the comma-separated `FEEDBIN_SYNC_EXTRA_TITLES` list (default `Joblo`), and feeds with `feedbinSync: true`. It uses `FEEDBIN_EMAIL` and `FEEDBIN_PASSWORD`. Set `FEEDBIN_SYNC_SUBSCRIPTIONS=false` to disable it. Missing credentials or a maintenance failure do not block direct RSS collection.
 
 To sync manually:
 
@@ -35,16 +35,17 @@ To test locally after authorization:
 ```bash
 export YOUTUBE_REFRESH_TOKEN=...
 npm run youtube:sync
+export YOUTUBE_SYNC_SUBSCRIPTIONS=true
 npm run digest -- --dry-run --no-ai --no-embeddings
 ```
 
 ### Settings and recovery
 
-Sync writes the ignored `config/youtube-subscriptions.json`, which the digest loads automatically when present. `YOUTUBE_TOPIC` selects the topic (default `YouTube`), and `YOUTUBE_MAX_SUBSCRIPTIONS` caps synced channels (`0` means no cap). `YOUTUBE_SKIP_UNAVAILABLE` defaults to `true`, skipping channel RSS feeds that return 404/410.
+Sync writes the ignored `config/youtube-subscriptions.json`, which the digest includes when this source is enabled and its refresh/cache is valid. `YOUTUBE_TOPIC` selects the topic (default `YouTube`), and `YOUTUBE_MAX_SUBSCRIPTIONS` caps synced channels (`0` means no cap). `YOUTUBE_SKIP_UNAVAILABLE` defaults to `true`, skipping channel RSS feeds that return 404/410.
 
-YouTube sync is optional by default: a failed OAuth refresh produces a workflow warning and generation continues without refreshed channel feeds. If the log reports `YouTube token refresh failed: Token has been expired or revoked.`, rerun `npm run youtube:authorize` and replace the `YOUTUBE_REFRESH_TOKEN` secret.
+YouTube sync is optional by default. A failed refresh uses the last validated private subscription cache (at most seven days old) with an age notice; without a usable cache, the digest explicitly reports missing YouTube coverage. Empty or malformed refreshes never replace a good cache. If OAuth has expired or been revoked, rerun `npm run youtube:authorize` and replace `YOUTUBE_REFRESH_TOKEN`.
 
-**Current workflow limitation:** `YOUTUBE_SYNC_REQUIRED=true` makes the send preflight require OAuth credentials, but does not reliably stop the workflow after a sync failure. The [sync step](../.github/workflows/daily-digest.yml) captures `$?` after the `if` statement, which has already replaced the failing command's status with `0`. Correcting that status handling is needed before relying on required sync to block a send.
+`YOUTUBE_SYNC_REQUIRED=true` now propagates a failed refresh as a nonzero process result and blocks generation. There is no shell status-capture step. See [delivery resilience](resilience.md) for stage budgets and cache privacy.
 
 ## Overcast
 
@@ -59,10 +60,11 @@ Overcast sync reads an OPML export without storing an Overcast username or passw
 ```bash
 export OVERCAST_OPML_PATH=/path/to/overcast.opml
 npm run overcast:sync
+export OVERCAST_SYNC_SUBSCRIPTIONS=true
 npm run digest -- --dry-run --no-ai --no-embeddings
 ```
 
-The sync reads `OVERCAST_OPML_PATH`, then `OVERCAST_OPML_BASE64`, then raw `OVERCAST_OPML`, in that priority order. It writes the ignored `config/podcast-subscriptions.json`, which the digest loads automatically when present.
+The sync reads `OVERCAST_OPML_PATH`, then `OVERCAST_OPML_BASE64`, then raw `OVERCAST_OPML`, in that priority order. It writes the ignored `config/podcast-subscriptions.json`, which the digest includes when this source is enabled and its refresh/cache is valid.
 
 `OVERCAST_TOPIC` selects the topic (default `Podcasts`), and `OVERCAST_MAX_SUBSCRIPTIONS` caps synced podcasts (`0` means no cap). `OVERCAST_MAX_EPISODES_PER_FEED` caps stored episode links from all-data exports; its default `0` keeps all links. `OVERCAST_SKIP_UNAVAILABLE` defaults to `true`, skipping feed URLs that return 404/410.
 
@@ -92,7 +94,7 @@ gh variable set OVERCAST_SYNC_SUBSCRIPTIONS --body true
 git add config/overcast-all-data.opml.gpg
 ```
 
-When the encrypted file exists and Overcast sync is enabled, the workflow requires `OVERCAST_OPML_GPG_PASSPHRASE`, decrypts into the runner's temporary directory, and sets `OVERCAST_OPML_PATH` before syncing. An existing encrypted file takes precedence over OPML secrets. Set `OVERCAST_OPML_ENCRYPTED_PATH` if the encrypted file lives elsewhere.
+When the encrypted file exists and Overcast sync is enabled, the refresh uses `OVERCAST_OPML_GPG_PASSPHRASE` over stdin to decrypt into a private temporary directory before syncing. Decryption and refresh are bounded; failure uses the last valid cache or an explicit missing-coverage notice. An existing encrypted file takes precedence over OPML secrets. Set `OVERCAST_OPML_ENCRYPTED_PATH` if the encrypted file lives elsewhere.
 
 Do not commit raw `.opml` or `.opml.b64` files. The repository ignores these under `config/`; exports placed at the root are not covered by those patterns.
 

@@ -2,9 +2,9 @@ name: Daily Digest
 
 on:
   schedule:
-    # Avoid minute zero, when GitHub documents the highest scheduled-workflow load.
-    # The explicit timezone removes the need for duplicate DST-aware UTC schedules.
-    - cron: "17 7 * * *"
+    # Target 7 AM Mountain time year-round. GitHub dispatch is best-effort;
+    # feed fetching and summary generation add a few minutes after job start.
+    - cron: "0 7 * * *"
       timezone: "America/Denver"
   workflow_dispatch:
     inputs:
@@ -42,12 +42,10 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: daily-digest
-  cancel-in-progress: false
-
 jobs:
   compare-summaries:
+    concurrency:
+      group: digest-comparison-${{ github.run_id }}
     if: github.event_name == 'workflow_dispatch' && inputs.compare_summaries
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -72,6 +70,10 @@ jobs:
           path: out/summary-comparison/
           retention-days: 7
   digest:
+    concurrency:
+      group: ${{ (github.event_name == 'schedule' || (!inputs.dry_run && !inputs.capture_inputs)) && 'digest-production' || format('digest-preview-{0}', github.run_id) }}
+      cancel-in-progress: false
+      queue: max
     if: ${{ !inputs.compare_summaries }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -112,7 +114,7 @@ jobs:
       YOUTUBE_CHECK_TIMEOUT_MS: ${{ vars.YOUTUBE_CHECK_TIMEOUT_MS || '8000' }}
       VIDEO_LITE_URL_TEMPLATE: ${{ vars.VIDEO_LITE_URL_TEMPLATE || '' }}
       SUBSTACK_ARCHIVE_LIMIT: ${{ vars.SUBSTACK_ARCHIVE_LIMIT || '30' }}
-      ALLOW_PARTIAL_DIGEST_SEND: ${{ vars.ALLOW_PARTIAL_DIGEST_SEND || 'false' }}
+      ALLOW_PARTIAL_DIGEST_SEND: ${{ vars.ALLOW_PARTIAL_DIGEST_SEND || 'true' }}
       USE_EMBEDDINGS: ${{ vars.USE_EMBEDDINGS || 'true' }}
       FETCH_OG_IMAGES: ${{ vars.FETCH_OG_IMAGES || 'true' }}
       IMAGE_CONCURRENCY: ${{ vars.IMAGE_CONCURRENCY || '5' }}
@@ -174,39 +176,17 @@ jobs:
         if: steps.mode.outputs.should_run == 'true'
         run: npm run check
 
-      - name: Decrypt Overcast all-data OPML
-        if: steps.mode.outputs.should_run == 'true' && env.OVERCAST_SYNC_SUBSCRIPTIONS == 'true'
-        env:
-          OVERCAST_OPML_GPG_PASSPHRASE: ${{ secrets.OVERCAST_OPML_GPG_PASSPHRASE }}
-        shell: bash
-        run: |
-          if [[ ! -f "${OVERCAST_OPML_ENCRYPTED_PATH}" ]]; then
-            echo "No encrypted Overcast OPML found at ${OVERCAST_OPML_ENCRYPTED_PATH}; using configured OPML secrets if present."
-            exit 0
-          fi
-
-          if [[ -z "${OVERCAST_OPML_GPG_PASSPHRASE}" ]]; then
-            echo "::error::OVERCAST_OPML_GPG_PASSPHRASE is required to decrypt ${OVERCAST_OPML_ENCRYPTED_PATH}."
-            exit 1
-          fi
-
-          decrypted_path="${RUNNER_TEMP}/overcast-all-data.opml"
-          gpg --batch --yes --pinentry-mode loopback \
-            --passphrase "${OVERCAST_OPML_GPG_PASSPHRASE}" \
-            --output "${decrypted_path}" \
-            --decrypt "${OVERCAST_OPML_ENCRYPTED_PATH}"
-
-          echo "OVERCAST_OPML_PATH=${decrypted_path}" >> "${GITHUB_ENV}"
-
       - name: Check send environment
         if: steps.mode.outputs.should_run == 'true' && steps.mode.outputs.send == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_STATE_URL: ${{ secrets.DIGEST_STATE_URL }}
+          DIGEST_STATE_TOKEN: ${{ secrets.DIGEST_STATE_TOKEN }}
           DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
           DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
           FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
           FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
+          OVERCAST_OPML_GPG_PASSPHRASE: ${{ secrets.OVERCAST_OPML_GPG_PASSPHRASE }}
           OVERCAST_OPML: ${{ secrets.OVERCAST_OPML }}
           OVERCAST_OPML_BASE64: ${{ secrets.OVERCAST_OPML_BASE64 }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -214,54 +194,25 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: npm run check:env
 
-      - name: Sync Feedbin subscriptions
-        if: steps.mode.outputs.should_run == 'true' && steps.mode.outputs.send == 'true' && env.FEEDBIN_SYNC_SUBSCRIPTIONS == 'true'
-        env:
-          FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
-          FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
-        run: npm run feedbin:sync
-
-      - name: Sync Overcast subscriptions
-        if: steps.mode.outputs.should_run == 'true' && env.OVERCAST_SYNC_SUBSCRIPTIONS == 'true'
-        env:
-          OVERCAST_OPML: ${{ secrets.OVERCAST_OPML }}
-          OVERCAST_OPML_BASE64: ${{ secrets.OVERCAST_OPML_BASE64 }}
-        run: npm run overcast:sync
-
-      - name: Sync YouTube subscriptions
-        if: steps.mode.outputs.should_run == 'true' && env.YOUTUBE_SYNC_SUBSCRIPTIONS == 'true'
-        env:
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-        shell: bash
-        run: |
-          if npm run youtube:sync; then
-            exit 0
-          fi
-
-          status=$?
-          if [[ "${YOUTUBE_SYNC_REQUIRED}" == "true" ]]; then
-            echo "::error::YouTube subscription sync failed and YOUTUBE_SYNC_REQUIRED=true."
-            exit "${status}"
-          fi
-
-          echo "::warning::YouTube subscription sync failed; continuing without refreshed YouTube subscription feeds. Re-authorize YOUTUBE_REFRESH_TOKEN or set YOUTUBE_SYNC_REQUIRED=true if this should block the digest."
-
       - name: Build digest
+        timeout-minutes: 12
         if: steps.mode.outputs.should_run == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_STATE_URL: ${{ secrets.DIGEST_STATE_URL }}
+          DIGEST_STATE_TOKEN: ${{ secrets.DIGEST_STATE_TOKEN }}
           DIGEST_FROM_EMAIL: ${{ secrets.DIGEST_FROM_EMAIL }}
           DIGEST_TO_EMAIL: ${{ secrets.DIGEST_TO_EMAIL }}
           FEEDBIN_EMAIL: ${{ secrets.FEEDBIN_EMAIL }}
           FEEDBIN_PASSWORD: ${{ secrets.FEEDBIN_PASSWORD }}
+          OVERCAST_OPML_GPG_PASSPHRASE: ${{ secrets.OVERCAST_OPML_GPG_PASSPHRASE }}
           OVERCAST_OPML: ${{ secrets.OVERCAST_OPML }}
           OVERCAST_OPML_BASE64: ${{ secrets.OVERCAST_OPML_BASE64 }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          INPUT_START: ${{ inputs.start }}
+          INPUT_END: ${{ inputs.end }}
         shell: bash
         run: |
           args=()
@@ -280,12 +231,12 @@ jobs:
               args+=(--test-window)
             fi
 
-            if [[ -n "${{ inputs.start }}" ]]; then
-              args+=(--start "${{ inputs.start }}")
+            if [[ -n "${INPUT_START}" ]]; then
+              args+=(--start "${INPUT_START}")
             fi
 
-            if [[ -n "${{ inputs.end }}" ]]; then
-              args+=(--end "${{ inputs.end }}")
+            if [[ -n "${INPUT_END}" ]]; then
+              args+=(--end "${INPUT_END}")
             fi
           fi
 

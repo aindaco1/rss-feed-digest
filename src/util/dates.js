@@ -1,6 +1,8 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export function previousLocalDate(date) {
+  return new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
 const OFFSET_PATTERN = /(?:z|[+-]\d{2}:?\d{2})$/i;
 
 export function parseDateInput(value, timezone) {
@@ -17,7 +19,7 @@ export function parseDateInput(value, timezone) {
   return date;
 }
 
-export function resolveDigestWindow(args, digestConfig) {
+export function resolveDigestWindow(args, digestConfig, now = new Date()) {
   const timezone = digestConfig.timezone || "America/Denver";
   const sendTime = digestConfig.sendTime || "07:00";
 
@@ -38,15 +40,15 @@ export function resolveDigestWindow(args, digestConfig) {
     return describeWindow(explicitStart, explicitEnd, timezone, digestConfig.dateFormat);
   }
 
-  const now = new Date();
-  const localDate = formatInTimeZone(now, timezone, "yyyy-MM-dd");
+  let localDate = formatInTimeZone(now, timezone, "yyyy-MM-dd");
   let end = fromZonedTime(`${localDate}T${sendTime}:00`, timezone);
 
   if (now < end) {
-    end = new Date(end.getTime() - DAY_MS);
+    localDate = previousLocalDate(localDate);
+    end = fromZonedTime(`${localDate}T${sendTime}:00`, timezone);
   }
 
-  const start = new Date(end.getTime() - DAY_MS);
+  const start = fromZonedTime(`${previousLocalDate(localDate)}T${sendTime}:00`, timezone);
   return describeWindow(start, end, timezone, digestConfig.dateFormat);
 }
 

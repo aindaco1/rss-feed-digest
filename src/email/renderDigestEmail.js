@@ -245,7 +245,7 @@ function bottomTopicRank(topic) {
   return BOTTOM_TOPIC_ORDER.has(name) ? BOTTOM_TOPIC_ORDER.get(name) : null;
 }
 
-export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, intro, headerImageUrl, topics }) {
+export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, intro, headerImageUrl, topics, notices = [] }) {
   const headerImage = headerImageUrl
     ? `<img src="${escapeHtml(headerImageUrl)}" alt="" style="display:block;width:100%;height:auto;border:0;">`
     : "";
@@ -276,6 +276,7 @@ export function renderDigestEmail({ title = "Alonso's Daily Digest", dateLabel, 
         <header style="${styles.header}">
           <p style="${styles.eyebrow}">${escapeHtml(dateLabel)}</p>
           <h1 style="${styles.h1}">${escapeHtml(title)}</h1>
+          ${notices.map(notice => `<p style="${styles.deck}">${escapeHtml(notice)}</p>`).join("\n")}
           ${intro ? `<p style="${styles.deck}">${escapeHtml(intro)}</p>` : ""}
         </header>
         ${orderTopicsForEmail(topics).map(renderTopic).join("\n")}

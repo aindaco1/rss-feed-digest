@@ -1,3 +1,4 @@
+import { remainingMs, requestTimeout } from "../util/network.js";
 import OpenAI from "openai";
 import { mapLimit } from "../util/concurrency.js";
 import { appLinkForArticle } from "../util/appLinks.js";
@@ -28,6 +29,8 @@ export async function summarizeClusters(clusters, config, options = {}) {
   const summarizeAll = env.AI_SUMMARIZE_SINGLE_ARTICLES !== "false";
   const client = useAI ? options.client || new OpenAI({ apiKey: options.apiKey }) : null;
   const maxAttempts = options.retry === false ? 1 : 2;
+  const deadline = options.deadline ?? Date.now() + 240_000;
+  let providerErrors = 0;
   let aiClusters = 0;
   let aiCalls = 0;
   let aiFailures = 0;
@@ -38,6 +41,9 @@ export async function summarizeClusters(clusters, config, options = {}) {
     if (!client) return { ...card, summaryReason: "disabled" };
     if (!summarizeAll && cluster.articles.length === 1) return { ...card, summaryReason: "single_disabled" };
     if (aiMaxClusters > 0 && aiClusters >= aiMaxClusters) return { ...card, summaryReason: "limit" };
+
+    if (!remainingMs(deadline)) return { ...card, summaryReason: "deadline" };
+    if (providerErrors >= 3) return { ...card, summaryReason: "provider_unavailable" };
 
     aiClusters += 1;
     try {
@@ -51,7 +57,8 @@ export async function summarizeClusters(clusters, config, options = {}) {
           const response = await client.responses.create(attempt ? {
             ...request,
             input: [...request.input, { role: "user", content: `Try again. Return valid JSON in the required schema. ${style}` }]
-          } : request, { maxRetries: 0, timeout: 45_000 });
+          } : request, { maxRetries: 0, timeout: requestTimeout(45_000, deadline), signal: AbortSignal.timeout(Math.ceil(requestTimeout(45_000, deadline))) });
+          providerErrors = 0;
           const aiArticle = parseSummaryResponse(response, topicOrder, maxWords);
           return {
             ...card, ...aiArticle,
@@ -60,7 +67,9 @@ export async function summarizeClusters(clusters, config, options = {}) {
             summaryKind: "ai", summaryReason: null
           };
         } catch (error) {
-          if (attempt + 1 === maxAttempts) throw error;
+          if (error.status === 401 || error.status === 403) providerErrors = 3;
+          else if (error.status === 429 || error.status >= 500 || /timeout|connection|network/i.test(`${error.name} ${error.message}`)) providerErrors += 1;
+          if (providerErrors >= 3 || !remainingMs(deadline) || attempt + 1 === maxAttempts) throw error;
         }
       }
     } catch {

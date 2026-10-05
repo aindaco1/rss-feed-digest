@@ -1,10 +1,8 @@
 export const REQUIRED_FOR_SEND = Object.freeze([
-  "OPENAI_API_KEY",
-  "RESEND_API_KEY",
+  "DIGEST_STATE_URL",
+  "DIGEST_STATE_TOKEN",
   "DIGEST_FROM_EMAIL",
-  "DIGEST_TO_EMAIL",
-  "FEEDBIN_EMAIL",
-  "FEEDBIN_PASSWORD"
+  "DIGEST_TO_EMAIL"
 ]);
 
 export const REQUIRED_FOR_YOUTUBE_SYNC = Object.freeze([
@@ -80,6 +78,10 @@ export const WORKFLOW_VARIABLES = Object.freeze([
   "NO_BROAD_CLUSTER_TOPICS"
 ]);
 
+export const OPTIONAL_CREDENTIALS = Object.freeze([
+  "OPENAI_API_KEY", "RESEND_API_KEY", "FEEDBIN_EMAIL", "FEEDBIN_PASSWORD", "OVERCAST_OPML_GPG_PASSPHRASE"
+]);
+
 export const LOCAL_ONLY_VARIABLES = Object.freeze([
   "SEND_DIGEST",
   "FEEDBIN_API_BASE",
@@ -92,7 +94,7 @@ export const LOCAL_ONLY_VARIABLES = Object.freeze([
 ]);
 
 export const OPTIONAL_VARIABLES = Object.freeze(
-  [...new Set([...WORKFLOW_VARIABLES, ...LOCAL_ONLY_VARIABLES, ...OVERCAST_OPML_SOURCES])].filter(
+  [...new Set([...OPTIONAL_CREDENTIALS, ...WORKFLOW_VARIABLES, ...LOCAL_ONLY_VARIABLES, ...OVERCAST_OPML_SOURCES])].filter(
     (name) =>
       !REQUIRED_FOR_SEND.includes(name) &&
       !REQUIRED_FOR_YOUTUBE_SYNC.includes(name) &&
@@ -109,10 +111,7 @@ export function evaluateEnvironment(env = process.env) {
       ? [...REQUIRED_FOR_SEND, ...REQUIRED_FOR_YOUTUBE_SYNC]
       : REQUIRED_FOR_SEND;
   const missing = [
-    ...required.filter((name) => !env[name]),
-    ...(overcastSyncEnabled && !OVERCAST_OPML_SOURCES.some((name) => env[name])
-      ? ["one Overcast OPML source"]
-      : [])
+    ...required.filter((name) => !env[name])
   ];
 
   return {

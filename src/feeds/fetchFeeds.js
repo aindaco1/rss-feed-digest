@@ -1,3 +1,5 @@
+import { readBoundedText, readBoundedJson } from "@dustwave/worker-core/response-body";
+import { requestTimeout, remainingMs, retryableStatus, pause } from "../util/network.js";
 import Parser from "rss-parser";
 import * as cheerio from "cheerio/slim";
 import { mapLimit } from "../util/concurrency.js";
@@ -12,7 +14,6 @@ const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (compatible; AlonsoDailyDigest/0.1; +https://dustwave.xyz/)";
 const BROWSER_FALLBACK_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
-const RETRYABLE_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504]);
 
 const parser = new Parser({
   customFields: {
@@ -29,6 +30,7 @@ const parser = new Parser({
 });
 
 export async function fetchArticles(config, window, options = {}) {
+  options = { deadline: Date.now() + 180_000, ...options };
   const env = options.env || process.env;
   const concurrency = Number(options.concurrency || env.FEED_CONCURRENCY || 8);
   const activeFeeds = config.feeds.filter((feed) => !feed.disabled);
@@ -74,7 +76,9 @@ export async function fetchArticles(config, window, options = {}) {
   return {
     articles: dedupeArticles(articles),
     failures,
-    skippedFeeds
+    skippedFeeds,
+    successfulFeeds: results.filter(result => !result.error).length,
+    activeFeedCount: activeFeeds.length
   };
 }
 
@@ -147,7 +151,8 @@ export async function fetchFeedXml(feedUrl, options = {}) {
         throw terminalError;
       }
 
-      await sleep(retryDelayMs(attempt, options));
+      if (!remainingMs(options.deadline)) throw error;
+      await pause(retryDelayMs(attempt, options), options.deadline);
     }
   }
 
@@ -156,7 +161,7 @@ export async function fetchFeedXml(feedUrl, options = {}) {
 
 async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
+  const timeout = setTimeout(() => controller.abort(), requestTimeout(fetchTimeoutMs(options), options.deadline));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -171,7 +176,7 @@ async function fetchFeedXmlOnce(feedUrl, options = {}, attempt = 1) {
       throw statusError(response.status);
     }
 
-    const text = await response.text();
+    const text = await readBoundedText(response, 5_000_000);
     const firstChunk = text.slice(0, 500).toLowerCase();
 
     if (firstChunk.includes("<!doctype html") || firstChunk.includes("<html")) {
@@ -190,6 +195,7 @@ export async function hydrateMissingImages(articles, options = {}) {
   const missing = articles.filter((article) => !article.imageUrl || shouldHydrateFromPage(article.imageUrl));
 
   await mapLimit(missing, concurrency, async (article) => {
+    if (!remainingMs(options.deadline)) return;
     const hydratedImageUrl = await fetchMetaImage(article.url, options);
 
     if (hydratedImageUrl) {
@@ -236,8 +242,9 @@ async function fetchArticleHtml(url, options = {}) {
 }
 
 async function fetchHtmlPage(url, options = {}) {
+  if (!remainingMs(options.deadline)) return null;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 8000));
+  const timeout = setTimeout(() => controller.abort(), requestTimeout(Number(options.timeoutMs || 8000), options.deadline));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -263,7 +270,7 @@ async function fetchHtmlPage(url, options = {}) {
     }
 
     return {
-      html: (await response.text()).slice(0, 500000),
+      html: await readBoundedText(response, 500_000),
       url: response.url || url
     };
   } catch {
@@ -315,7 +322,7 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
   archiveUrl.searchParams.set("limit", String(options.substackArchiveLimit || env.SUBSTACK_ARCHIVE_LIMIT || 30));
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
+  const timeout = setTimeout(() => controller.abort(), requestTimeout(fetchTimeoutMs(options), options.deadline));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -330,7 +337,7 @@ async function fetchSubstackArchiveAsRss(feedUrl, options = {}) {
       throw statusError(response.status);
     }
 
-    const posts = await response.json();
+    const posts = await readBoundedJson(response, 5_000_000);
     if (!Array.isArray(posts)) {
       throw new Error("Archive response was not a post list");
     }
@@ -377,7 +384,7 @@ async function fetchFeedbinSubscriptions(options = {}) {
 
 async function fetchFeedbinJson(url, options = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs(options));
+  const timeout = setTimeout(() => controller.abort(), requestTimeout(fetchTimeoutMs(options), options.deadline));
   const fetchImpl = options.fetchImpl || fetch;
 
   try {
@@ -395,7 +402,7 @@ async function fetchFeedbinJson(url, options = {}) {
       throw statusError(response.status);
     }
 
-    return response.json();
+    return await readBoundedJson(response, 5_000_000);
   } finally {
     clearTimeout(timeout);
   }
@@ -437,7 +444,7 @@ function fetchTimeoutMs(options = {}) {
 }
 
 function isRetryableFetchError(error) {
-  if (RETRYABLE_STATUSES.has(error?.status)) return true;
+  if (retryableStatus(error?.status)) return true;
   return error?.name === "AbortError" || /fetch failed|network|timeout/i.test(errorMessage(error));
 }
 
@@ -446,10 +453,6 @@ function retryDelayMs(attempt, options) {
   const base = Number(options.retryBaseDelayMs ?? env.FEED_RETRY_BASE_DELAY_MS ?? 750);
   const jitter = Number(options.retryJitterMs ?? env.FEED_RETRY_JITTER_MS ?? 250);
   return base * 2 ** (attempt - 1) + Math.floor(Math.random() * jitter);
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isSubstackFeedUrl(rawUrl) {
