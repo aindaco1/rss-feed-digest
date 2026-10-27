@@ -43,6 +43,10 @@ Feeds with `excludeSponsored: true` drop articles with explicit disclosures in t
 
 YouTube Shorts are filtered out. YTS release titles are shortened by removing source tags such as `[YTS.BZ]` while keeping useful release details. The email renderer places the `YouTube`, `Podcasts`, and `Downloads` sections at the bottom. Provider-specific link behavior is documented under [app links](subscriptions.md#app-links).
 
+`Local` includes the New Mexico sources marked `topic: "Local"` and New Mexico news from other publishers. For other news feeds, routing checks the source headline and lead (the first paragraph, capped at 500 characters, using the summary or otherwise the body) for New Mexico, N.M., uppercase NM, or distinctive locations including Albuquerque, Las Cruces, Rio Rancho, Los Alamos, Bernalillo, Alamogordo, Ruidoso, and Truth or Consequences. Publisher names, generated summaries, and passing references buried later in the body do not qualify. Ambiguous city names such as Santa Fe or Las Vegas need a state reference. Podcast and YouTube sources do not receive this news-routing override.
+
+Items from `Downloads` feeds stay in Downloads even when their subject is comics, music, or film, including releases set in New Mexico. The routing rules constrain the AI's allowed topics and are enforced again after its response, as well as in headline-only editions. For exact-URL duplicates with mixed feed categories, Downloads takes priority, followed by Local. Other stories can still be reassigned among the remaining sections. To include another New Mexico source in Local by default, assign that feed the Local topic in the manifest.
+
 ## Clustering
 
 Clustering first combines exact canonical URL matches, then optionally uses embeddings for high-similarity articles. Its fallback scorer builds a corpus-weighted profile from each article's title, summary, text, and nearby phrase pairs. Terms and phrases that are rarer in the current candidate set carry more weight; low-signal template words are suppressed. Articles merge only when the semantic score is supported by shared signal terms or phrases.

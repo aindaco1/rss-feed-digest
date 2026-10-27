@@ -180,6 +180,112 @@ test("independent monitor dispatches bounded recovery and deduplicates deadline 
   assert.equal(dispatches, 3); assert.equal(alerts, 1);
 });
 
+function monitorFixture() {
+  const objects = new Map();
+  const env = { START_DATE: "2026-10-27", GITHUB_REPOSITORY: "example/digest", GITHUB_DISPATCH_TOKEN: "fixture", RESEND_API_KEY: "fixture", DIGEST_FROM_EMAIL: "from@example.com", DIGEST_TO_EMAIL: "to@example.com", DIGEST_STATE: {
+    idFromName: name => name,
+    get: name => {
+      if (!objects.has(name)) objects.set(name, new DigestState({ storage: new Storage() }, env));
+      return objects.get(name);
+    }
+  } };
+  return { env, edition: () => env.DIGEST_STATE.get("daily-digest/2026-10-27") };
+}
+
+test("lost GitHub dispatch response with a running job does not consume the daily alert", async t => {
+  const { env, edition } = monitorFixture();
+  let now = Date.parse("2026-10-27T13:00:00Z");
+  t.mock.method(Date, "now", () => now);
+  let dispatches = 0;
+  const alerts = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    if (String(url).includes("api.github.com")) {
+      dispatches++;
+      await edition().fetch(new Request("https://state/claim", { method: "POST", body: JSON.stringify({
+        ...input, key: "daily-digest/2026-10-27", owner: "launched-runner"
+      }) }));
+      throw new DOMException("The operation was aborted", "AbortError");
+    }
+    alerts.push(JSON.parse(init.body));
+    return Response.json({ id: "alert-id" });
+  });
+  const errors = t.mock.method(console, "error", () => {});
+  await monitor(env, new Date(now));
+  assert.equal(dispatches, 1);
+  assert.equal(alerts.length, 0);
+  assert.equal(errors.mock.callCount(), 0);
+  // A subsequent genuine delivery failure must still be able to alert today.
+  const state = await edition().storage.get("state");
+  await edition().storage.put("state", { ...state, status: "accepted", deliveryStatus: "bounced", acceptedAt: now });
+  now += 15 * 60_000;
+  await monitor(env, new Date(now));
+  assert.equal(alerts.length, 1);
+  assert.match(alerts[0].text, /provider reports bounced/);
+  assert.equal(dispatches, 1);
+});
+
+test("uncertain dispatch waits for the deadline but persistent launch failure still alerts and retries are bounded", async t => {
+  const { env } = monitorFixture();
+  let now = Date.parse("2026-10-27T13:00:00Z");
+  t.mock.method(Date, "now", () => now);
+  let dispatches = 0;
+  const alerts = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    if (String(url).includes("api.github.com")) {
+      dispatches++;
+      throw new DOMException("The operation was aborted", "AbortError");
+    }
+    alerts.push(JSON.parse(init.body));
+    return Response.json({ id: "alert-id" });
+  });
+  const errors = t.mock.method(console, "error", () => {});
+  await monitor(env, new Date(now));
+  assert.equal(dispatches, 1);
+  assert.equal(alerts.length, 0);
+  assert.equal(errors.mock.callCount(), 0);
+  for (let i = 0; i < 3; i++) {
+    now += 15 * 60_000;
+    await monitor(env, new Date(now));
+  }
+  assert.equal(dispatches, 3);
+  assert.equal(alerts.length, 1);
+  assert.match(alerts[0].text, /no edition generated; GitHub workflow dispatch response timed out/);
+});
+
+test("dispatch response lost after acceptance uses the fresh receipt even after the deadline", async t => {
+  const { env, edition } = monitorFixture();
+  const now = Date.parse("2026-10-27T13:15:00Z");
+  t.mock.method(Date, "now", () => now);
+  t.mock.method(globalThis, "fetch", async url => {
+    assert.ok(String(url).includes("api.github.com"), "must not send an alert");
+    const state = await edition().storage.get("state");
+    await edition().storage.put("state", { ...state, status: "accepted", deliveryStatus: "delivered", acceptedAt: now });
+    throw new DOMException("The operation was aborted", "AbortError");
+  });
+  const errors = t.mock.method(console, "error", () => {});
+  await monitor(env, new Date(now));
+  assert.equal(errors.mock.callCount(), 0);
+});
+
+test("GitHub rejection and failed state inspection retain actionable alert context", async t => {
+  const { env } = monitorFixture();
+  const now = Date.parse("2026-10-27T13:15:00Z");
+  t.mock.method(Date, "now", () => now);
+  const alerts = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    if (String(url).includes("api.github.com")) return new Response(null, { status: 401 });
+    alerts.push(JSON.parse(init.body));
+    return Response.json({ id: "alert-id" });
+  });
+  await monitor(env, new Date(now));
+  assert.match(alerts[0].text, /GitHub workflow dispatch failed: HTTP 401/);
+  const broken = monitorFixture().env;
+  const get = broken.DIGEST_STATE.get;
+  broken.DIGEST_STATE.get = key => key.startsWith("daily-digest/") ? { fetch: async () => { throw new Error("Storage unavailable"); } } : get(key);
+  await monitor(broken, new Date(now));
+  assert.match(alerts[1].text, /edition delivery check failed: Storage unavailable/);
+});
+
 test("reconciliation requires a matching provider email and never sends", async t => {
   const f = fixture(); await ready(f);
   await f.storage.put("state", { ...await f.storage.get("state"), status: "review", attempts: 1, firstAttemptAt: Date.now() - RETRY_WINDOW_MS });

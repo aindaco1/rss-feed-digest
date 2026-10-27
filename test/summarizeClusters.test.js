@@ -105,6 +105,106 @@ const coverageCluster = {
   ]
 };
 
+test("Local and Downloads obey source categories in AI requests, responses, and headline-only fallback", async () => {
+  const topics = ["Tech", "Local", "Comics", "Music", "Film", "Downloads"];
+  const cases = [
+    { hint: "Tech", title: "Halloween display divides residents of Casper, Wyoming", proposed: "Local", expected: "Tech" },
+    { hint: "Tech", title: "Sewer-dwelling man harassing local children, says Baltimore mom", proposed: "Local", expected: "Tech" },
+    { hint: "Downloads", title: "Collected comics volume", proposed: "Comics", expected: "Downloads" },
+    { hint: "Downloads", title: "Album reissue", proposed: "Music", expected: "Downloads" },
+    { hint: "Downloads", title: "1080p film release", proposed: "Film", expected: "Downloads" },
+    { hint: "Local", title: "Albuquerque taproom closes", proposed: "Tech", expected: "Local" },
+    // A duplicate URL collected from Downloads and another feed retains its
+    // source boundary even if the cluster's majority/lead hint is different.
+    { hint: "Comics", sourceHint: "Downloads", title: "Collected comics duplicate", proposed: "Comics", expected: "Downloads" }
+  ];
+  for (const { hint, sourceHint = hint, title, proposed, expected } of cases) {
+    const cluster = { id: title, topicHint: hint, latestPublishedAt: "2026-10-27T12:00:00Z", articles: [
+      article({ id: "routing", title, sourceName: "Fixture source", topicHint: sourceHint })
+    ] };
+    let request;
+    const client = { responses: { create: async payload => {
+      request = payload;
+      return { output_text: JSON.stringify({ headline: title, summary: "A concise source summary.", topic: proposed }) };
+    } } };
+    const digest = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", client });
+    assert.equal(digest.articles[0].topic, expected, title);
+    assert.equal(digest.articles[0].summaryKind, "ai");
+    assert.equal(digest.aiCalls, 1);
+    assert.equal(digest.topics[0].name, expected);
+    const allowed = request.text.format.schema.properties.topic.enum;
+    assert.deepEqual(JSON.parse(request.input[1].content).allowedTopics, allowed);
+    assert.deepEqual(allowed, expected === "Tech" ? ["Tech", "Comics", "Music", "Film"] : [expected]);
+    const fallback = await summarizeClusters([cluster], { topics }, { env: {}, disableAI: true });
+    assert.equal(fallback.articles[0].topic, expected);
+    const failed = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", retry: false,
+      client: { responses: { create: async () => { throw new Error("Provider unavailable"); } } }
+    });
+    assert.equal(failed.articles[0].topic, expected);
+  }
+});
+
+test("ordinary nonlocal stories can still change topic without entering Local or Downloads", async () => {
+  const topics = ["Tech", "Film", "Local", "Downloads"];
+  const client = { responses: { create: async () => ({ output_text: JSON.stringify({ headline: "Film news", summary: "A film update.", topic: "Film" }) }) } };
+  const digest = await summarizeClusters([coverageCluster], { topics }, { env: {}, apiKey: "fixture", client });
+  assert.equal(digest.topics[0].name, "Film");
+});
+
+test("New Mexico news from other publishers goes to Local, including without an AI summary", async () => {
+  const topics = ["Tech", "Politics", "Film", "Local", "Downloads"];
+  for (const source of [
+    { title: "New Mexico passes a new voting law", topicHint: "Politics" },
+    { title: "Albuquerque hospital restores service after cyberattack", topicHint: "Tech" },
+    { title: "Production begins on new film", summary: "The crew began filming in Las Cruces this week.", topicHint: "Film" },
+    { title: "Hospital reopens", summary: "", text: "The hospital in Rio Rancho has reopened.", topicHint: "Tech" },
+    { title: "Santa Fe, NM expands transit routes", topicHint: "Politics" },
+    { title: "NM lawmakers debate a new bill", topicHint: "Politics" },
+    { title: "N.M. lawmakers approve infrastructure funding", topicHint: "Politics" }
+  ]) {
+    const cluster = { ...coverageCluster, topicHint: source.topicHint, articles: [{
+      ...article({ id: "national-source", title: source.title, sourceName: "National news" }), ...source
+    }] };
+    let request;
+    const client = { responses: { create: async payload => {
+      request = payload;
+      return { output_text: JSON.stringify({ headline: source.title, summary: "A source-backed news update.", topic: source.topicHint }) };
+    } } };
+    const digest = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", client });
+    assert.equal(digest.topics[0].name, "Local", source.title);
+    assert.equal(digest.articles[0].summaryKind, "ai");
+    assert.deepEqual(request.text.format.schema.properties.topic.enum, ["Local"]);
+    const fallback = await summarizeClusters([cluster], { topics }, { env: {}, disableAI: true });
+    assert.equal(fallback.topics[0].name, "Local", source.title);
+    const failed = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", retry: false,
+      client: { responses: { create: async () => { throw new Error("Provider unavailable"); } } }
+    });
+    assert.equal(failed.topics[0].name, "Local", source.title);
+  }
+});
+
+test("New Mexico routing does not use publisher metadata, distant references, ambiguous cities, or download settings", async () => {
+  const topics = ["Tech", "Local", "Downloads", "Podcasts", "YouTube"];
+  for (const source of [
+    { title: "New Mexico (2026) 1080p", topicHint: "Downloads" },
+    { title: "A conversation about Albuquerque", topicHint: "Podcasts", sourceType: "podcast" },
+    { title: "A tour of New Mexico", topicHint: "YouTube", sourceType: "youtube" },
+    { title: "A new processor uses a 2 nm process", topicHint: "Tech" },
+    { title: "Las Vegas conference announces new dates", topicHint: "Tech" },
+    { title: "Santa Fe, Argentina expands local services", topicHint: "Tech" },
+    { title: "Local children report harassment in Baltimore", topicHint: "Tech", sourceName: "New Mexico News" },
+    { title: "A national technology update", topicHint: "Tech", summary: "A national technology update.", text: "Context. ".repeat(100) + "A prior example was in New Mexico." }
+  ]) {
+    const cluster = { ...coverageCluster, topicHint: source.topicHint, articles: [{
+      ...article({ id: "routing-boundary", title: source.title, sourceName: "Other publisher" }), ...source
+    }] };
+    const digest = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", client: {
+      responses: { create: async () => ({ output_text: JSON.stringify({ headline: source.title, summary: "A concise update.", topic: "Local" }) }) }
+    } });
+    assert.equal(digest.topics[0].name, source.topicHint, source.title);
+  }
+});
+
 test("disabled synthesis keeps headlines and every source link without copied excerpts", async () => {
   const cluster = { ...coverageCluster, articles: [...coverageCluster.articles, coverageCluster.articles[0]] };
   const digest = await summarizeClusters([cluster], { topics: ["Tech"] }, { env: {}, disableAI: true });
