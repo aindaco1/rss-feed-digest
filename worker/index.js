@@ -17,6 +17,16 @@ export async function callState(env, key, action, data) {
   return response.json();
 }
 
+function editionIssue(state, now, window) {
+  if (state?.status === "accepted") {
+    if (["bounced", "complained", "failed", "suppressed"].includes(state.deliveryStatus)) return `provider reports ${state.deliveryStatus}`;
+    if (state.receiptCheckFailed) return "accepted by Resend; delivery lookup unavailable";
+    if (state.deliveryStatus !== "delivered" && +now - state.acceptedAt > 45 * 60_000) return "accepted by Resend; delivery not yet confirmed";
+    return null;
+  }
+  return +now - +window.end >= 15 * 60_000 ? state?.status || "no edition generated" : null;
+}
+
 export async function monitor(env, now = new Date()) {
   // Activation is explicit, preventing a fresh deployment from mailing old editions.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(env.START_DATE || "")) throw new Error("Set START_DATE before enabling the monitor");
@@ -30,27 +40,42 @@ export async function monitor(env, now = new Date()) {
     const window = resolveDigestWindow({ start: `${previousLocalDate(date)}T${digestConfig.sendTime}:00`, end: `${date}T${digestConfig.sendTime}:00` }, digestConfig);
     const key = `daily-digest/${date}`;
     let state;
+    let stage = "edition delivery check";
     try {
       state = await callState(env, key, "deliver", {});
       if (state?.status === "accepted") {
         // Alarms check provider delivery independently of GitHub.
-        if (["bounced", "complained", "failed", "suppressed"].includes(state.deliveryStatus)) issues.push(`${date}: provider reports ${state.deliveryStatus}`);
-        else if (state.receiptCheckFailed) issues.push(`${date}: accepted by Resend; delivery lookup unavailable`);
-        else if (state.deliveryStatus !== "delivered" && +now - state.acceptedAt > 45 * 60_000) issues.push(`${date}: accepted by Resend; delivery not yet confirmed`);
+        const issue = editionIssue(state, now, window);
+        if (issue) issues.push(`${date}: ${issue}`);
         continue;
       }
+      stage = "workflow dispatch decision";
       const decision = await callState(env, key, "dispatch", { key, window: { start: window.start.toISOString(), end: window.end.toISOString() } });
       state = decision.state;
+      let dispatchError;
       if (decision.dispatch) {
-        const { response } = await fetchText(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/actions/workflows/daily-digest.yml/dispatches`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "rss-feed-digest-monitor", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" },
-          body: JSON.stringify({ ref: env.GITHUB_REF || "main", inputs: { dry_run: "false", start: window.start.toISOString(), end: window.end.toISOString() } })
-        }, { maxBytes: 64_000 });
-        if (response.status !== 204) throw new Error(`GitHub dispatch failed (${response.status})`);
+        try {
+          const { response } = await fetchText(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/actions/workflows/daily-digest.yml/dispatches`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "rss-feed-digest-monitor", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" },
+            body: JSON.stringify({ ref: env.GITHUB_REF || "main", inputs: { dry_run: "false", start: window.start.toISOString(), end: window.end.toISOString() } })
+          }, { maxBytes: 64_000 });
+          if (response.status !== 204) throw new Error(`HTTP ${response.status}`);
+        } catch (error) {
+          dispatchError = error.name === "AbortError" || error.name === "TimeoutError"
+            ? "GitHub workflow dispatch response timed out"
+            : `GitHub workflow dispatch failed: ${error.message}`;
+          console.warn("Digest dispatch response unavailable", date, dispatchError);
+          // GitHub may have launched the job before its response was lost. Read
+          // fresh state, never retry the dispatch immediately or consume today's
+          // one attention email before the generation deadline.
+          stage = "edition status after uncertain workflow dispatch";
+          state = await callState(env, key, "status");
+        }
       }
-      if (+now - +window.end >= 15 * 60_000) issues.push(`${date}: ${state?.status || "no edition generated"}`);
-    } catch (error) { issues.push(`${date}: ${error.message}`); }
+      const issue = editionIssue(state, now, window);
+      if (issue) issues.push(`${date}: ${issue}${dispatchError && state?.status !== "accepted" ? `; ${dispatchError}` : ""}`);
+    } catch (error) { issues.push(`${date}: ${stage} failed: ${error.message}`); }
   }
   if (issues.length) {
     console.error("Digest deadline check", issues.join("; "));

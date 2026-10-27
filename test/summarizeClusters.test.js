@@ -105,6 +105,52 @@ const coverageCluster = {
   ]
 };
 
+test("Local and Downloads obey source categories in AI requests, responses, and headline-only fallback", async () => {
+  const topics = ["Tech", "Local", "Comics", "Music", "Film", "Downloads"];
+  const cases = [
+    { hint: "Tech", title: "Halloween display divides residents of Casper, Wyoming", proposed: "Local", expected: "Tech" },
+    { hint: "Tech", title: "Sewer-dwelling man harassing local children, says Baltimore mom", proposed: "Local", expected: "Tech" },
+    { hint: "Downloads", title: "Collected comics volume", proposed: "Comics", expected: "Downloads" },
+    { hint: "Downloads", title: "Album reissue", proposed: "Music", expected: "Downloads" },
+    { hint: "Downloads", title: "1080p film release", proposed: "Film", expected: "Downloads" },
+    { hint: "Local", title: "Albuquerque taproom closes", proposed: "Tech", expected: "Local" },
+    // A duplicate URL collected from Downloads and another feed retains its
+    // source boundary even if the cluster's majority/lead hint is different.
+    { hint: "Comics", sourceHint: "Downloads", title: "Collected comics duplicate", proposed: "Comics", expected: "Downloads" }
+  ];
+  for (const { hint, sourceHint = hint, title, proposed, expected } of cases) {
+    const cluster = { id: title, topicHint: hint, latestPublishedAt: "2026-10-27T12:00:00Z", articles: [
+      article({ id: "routing", title, sourceName: "Fixture source", topicHint: sourceHint })
+    ] };
+    let request;
+    const client = { responses: { create: async payload => {
+      request = payload;
+      return { output_text: JSON.stringify({ headline: title, summary: "A concise source summary.", topic: proposed }) };
+    } } };
+    const digest = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", client });
+    assert.equal(digest.articles[0].topic, expected, title);
+    assert.equal(digest.articles[0].summaryKind, "ai");
+    assert.equal(digest.aiCalls, 1);
+    assert.equal(digest.topics[0].name, expected);
+    const allowed = request.text.format.schema.properties.topic.enum;
+    assert.deepEqual(JSON.parse(request.input[1].content).allowedTopics, allowed);
+    assert.deepEqual(allowed, expected === "Tech" ? ["Tech", "Comics", "Music", "Film"] : [expected]);
+    const fallback = await summarizeClusters([cluster], { topics }, { env: {}, disableAI: true });
+    assert.equal(fallback.articles[0].topic, expected);
+    const failed = await summarizeClusters([cluster], { topics }, { env: {}, apiKey: "fixture", retry: false,
+      client: { responses: { create: async () => { throw new Error("Provider unavailable"); } } }
+    });
+    assert.equal(failed.articles[0].topic, expected);
+  }
+});
+
+test("ordinary stories can still change topic while they cannot enter source-only sections", async () => {
+  const topics = ["Tech", "Film", "Local", "Downloads"];
+  const client = { responses: { create: async () => ({ output_text: JSON.stringify({ headline: "Film news", summary: "A film update.", topic: "Film" }) }) } };
+  const digest = await summarizeClusters([coverageCluster], { topics }, { env: {}, apiKey: "fixture", client });
+  assert.equal(digest.topics[0].name, "Film");
+});
+
 test("disabled synthesis keeps headlines and every source link without copied excerpts", async () => {
   const cluster = { ...coverageCluster, articles: [...coverageCluster.articles, coverageCluster.articles[0]] };
   const digest = await summarizeClusters([cluster], { topics: ["Tech"] }, { env: {}, disableAI: true });

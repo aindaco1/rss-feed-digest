@@ -43,6 +43,8 @@ Feeds with `excludeSponsored: true` drop articles with explicit disclosures in t
 
 YouTube Shorts are filtered out. YTS release titles are shortened by removing source tags such as `[YTS.BZ]` while keeping useful release details. The email renderer places the `YouTube`, `Podcasts`, and `Downloads` sections at the bottom. Provider-specific link behavior is documented under [app links](subscriptions.md#app-links).
 
+`Local` and `Downloads` follow the configured feed categories. `Local` is reserved for the New Mexico sources marked `topic: "Local"`; a story being local to another city does not qualify. Items from `Downloads` feeds stay in Downloads even when their subject is comics, music, or film. These rules constrain the AI's allowed topics and are enforced again after its response, as well as in headline-only editions. For exact-URL duplicates with mixed feed categories, Downloads takes priority, followed by Local. Other stories can still be reassigned among the remaining sections. To include another New Mexico source in Local, assign that feed the Local topic in the manifest.
+
 ## Clustering
 
 Clustering first combines exact canonical URL matches, then optionally uses embeddings for high-similarity articles. Its fallback scorer builds a corpus-weighted profile from each article's title, summary, text, and nearby phrase pairs. Terms and phrases that are rarer in the current candidate set carry more weight; low-signal template words are suppressed. Articles merge only when the semantic score is supported by shared signal terms or phrases.
